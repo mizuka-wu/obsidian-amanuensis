@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "obsidian-amanuensis",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "An Obsidian plugin that helps you write and organize your thoughts with AI assistance.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
