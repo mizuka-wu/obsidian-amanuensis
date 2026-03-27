@@ -1,18 +1,19 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
-import MyPlugin from "./main";
+import { DEFAULT_PORT as DEFAULT_SERVER_PORT } from "./server";
 
+import AmanuensisPlugin from "./main";
 export interface AmanuensisPluginSettings {
-	mySetting: string;
+	port: string;
 }
 
 export const DEFAULT_SETTINGS: AmanuensisPluginSettings = {
-	mySetting: "default",
+	port: DEFAULT_SERVER_PORT + "",
 };
 
 export class AmanuensisSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+	plugin: AmanuensisPlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: AmanuensisPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
@@ -22,15 +23,18 @@ export class AmanuensisSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
+		/**
+		 * 端口号
+		 */
 		new Setting(containerEl)
-			.setName("Settings #1")
-			.setDesc("It's a secret")
+			.setName("端口号")
+			.setDesc("服务器端口号")
 			.addText((text) =>
 				text
-					.setPlaceholder("Enter your secret")
-					.setValue(this.plugin.settings.mySetting)
+					.setPlaceholder("7861")
+					.setValue(this.plugin.settings.port)
 					.onChange(async (value) => {
-						this.plugin.settings.mySetting = value;
+						this.plugin.settings.port = value;
 						await this.plugin.saveSettings();
 					}),
 			);

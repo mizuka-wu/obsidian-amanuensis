@@ -1,4 +1,5 @@
 import { Plugin } from "obsidian";
+import { AmanuensisServer } from "./server";
 import {
 	DEFAULT_SETTINGS,
 	AmanuensisPluginSettings,
@@ -10,16 +11,27 @@ import {
 export default class AmanuensisPlugin extends Plugin {
 	settings: AmanuensisPluginSettings;
 
+	server: AmanuensisServer | null = null;
+
 	async onload() {
 		await this.loadSettings();
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText("Status bar text");
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new AmanuensisSettingTab(this.app, this));
+
+		// Start the server
+		this.server = await AmanuensisServer.create({
+			port: +this.settings.port,
+		});
+
+		await this.server.start();
 	}
 
-	onunload() {}
+	// eslint-disable-next-line @typescript-eslint/no-misused-promises
+	async onunload() {
+		if (this.server) {
+			await this.server.stop();
+		}
+	}
 
 	async loadSettings() {
 		this.settings = Object.assign(
