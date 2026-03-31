@@ -67,6 +67,11 @@ export class AmanuensisServer {
 
 	async start(port: number = this._port) {
 		this._lastError = null;
+
+		if (!this.expressApplication) {
+			throw new Error("Server not initialized. Call create() first.");
+		}
+
 		// 先停止服务器
 		await this.stop();
 

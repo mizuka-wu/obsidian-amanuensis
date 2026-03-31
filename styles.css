@@ -6,3 +6,313 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+/*
+ * Model Config System Styles
+ * Compatible with Obsidian light and dark themes
+ */
+
+/* ============================================
+   LLM Settings Tab
+   ============================================ */
+
+.amanuensis-settings-section {
+	margin-bottom: 24px;
+}
+
+.amanuensis-settings-section-title {
+	font-weight: 600;
+	font-size: 1.1em;
+	margin-bottom: 12px;
+	color: var(--text-normal);
+}
+
+.amanuensis-settings-description {
+	color: var(--text-muted);
+	font-size: 0.9em;
+	margin-bottom: 16px;
+}
+
+/* ============================================
+   Provider List
+   ============================================ */
+
+.amanuensis-provider-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 16px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	margin-bottom: 8px;
+	background-color: var(--background-primary);
+}
+
+.amanuensis-provider-item:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.amanuensis-provider-info {
+	flex: 1;
+}
+
+.amanuensis-provider-name {
+	font-weight: 500;
+	color: var(--text-normal);
+	margin-bottom: 4px;
+}
+
+.amanuensis-provider-type {
+	font-size: 0.85em;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.amanuensis-provider-actions {
+	display: flex;
+	gap: 8px;
+}
+
+/* ============================================
+   Model List
+   ============================================ */
+
+.amanuensis-model-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 16px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	margin-bottom: 8px;
+	background-color: var(--background-primary);
+}
+
+.amanuensis-model-item:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.amanuensis-model-item.disabled {
+	opacity: 0.6;
+}
+
+.amanuensis-model-item.default {
+	border-color: var(--interactive-accent);
+	background-color: var(--background-modifier-success-hover);
+}
+
+.amanuensis-model-info {
+	flex: 1;
+}
+
+.amanuensis-model-name {
+	font-weight: 500;
+	color: var(--text-normal);
+	margin-bottom: 4px;
+}
+
+.amanuensis-model-provider {
+	font-size: 0.85em;
+	color: var(--text-muted);
+}
+
+.amanuensis-model-badge {
+	display: inline-block;
+	padding: 2px 8px;
+	font-size: 0.75em;
+	font-weight: 500;
+	border-radius: 4px;
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	margin-left: 8px;
+}
+
+.amanuensis-model-actions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+/* ============================================
+   Empty State
+   ============================================ */
+
+.amanuensis-empty-state {
+	padding: 24px;
+	text-align: center;
+	color: var(--text-muted);
+	border: 2px dashed var(--background-modifier-border);
+	border-radius: 8px;
+	margin: 16px 0;
+}
+
+.amanuensis-empty-state-text {
+	margin-bottom: 16px;
+	font-size: 0.95em;
+}
+
+/* ============================================
+   Modal Styles
+   ============================================ */
+
+.amanuensis-modal .modal-content {
+	padding: 16px;
+}
+
+.amanuensis-modal .setting-item {
+	padding: 12px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.amanuensis-modal .setting-item:last-child {
+	border-bottom: none;
+}
+
+.amanuensis-modal .setting-item-name {
+	font-weight: 500;
+	color: var(--text-normal);
+}
+
+.amanuensis-modal .setting-item-description {
+	font-size: 0.85em;
+	color: var(--text-muted);
+}
+
+.amanuensis-modal .modal-button-container {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 24px;
+	padding-top: 16px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+/* ============================================
+   Form Elements
+   ============================================ */
+
+.amanuensis-input {
+	width: 100%;
+	padding: 8px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	font-size: 0.95em;
+}
+
+.amanuensis-input:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+}
+
+.amanuensis-select {
+	width: 100%;
+	padding: 8px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	font-size: 0.95em;
+	cursor: pointer;
+}
+
+.amanuensis-select:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+}
+
+/* ============================================
+   Toggle Switch
+   ============================================ */
+
+.amanuensis-toggle {
+	position: relative;
+	display: inline-block;
+	width: 40px;
+	height: 20px;
+}
+
+.amanuensis-toggle input {
+	opacity: 0;
+	width: 0;
+	height: 0;
+}
+
+.amanuensis-toggle-slider {
+	position: absolute;
+	cursor: pointer;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background-color: var(--background-modifier-border);
+	transition: 0.3s;
+	border-radius: 20px;
+}
+
+.amanuensis-toggle-slider:before {
+	position: absolute;
+	content: "";
+	height: 16px;
+	width: 16px;
+	left: 2px;
+	bottom: 2px;
+	background-color: white;
+	transition: 0.3s;
+	border-radius: 50%;
+}
+
+input:checked + .amanuensis-toggle-slider {
+	background-color: var(--interactive-accent);
+}
+
+input:checked + .amanuensis-toggle-slider:before {
+	transform: translateX(20px);
+}
+
+/* ============================================
+   Model Dropdown
+   ============================================ */
+
+.amanuensis-model-dropdown {
+	width: 100%;
+	min-width: 200px;
+}
+
+.amanuensis-model-dropdown select {
+	width: 100%;
+	padding: 8px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	font-size: 0.95em;
+	cursor: pointer;
+}
+
+.amanuensis-model-dropdown select:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* ============================================
+   Responsive Adjustments
+   ============================================ */
+
+@media (max-width: 600px) {
+	.amanuensis-provider-item,
+	.amanuensis-model-item {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 12px;
+	}
+
+	.amanuensis-provider-actions,
+	.amanuensis-model-actions {
+		width: 100%;
+		justify-content: flex-end;
+	}
+}

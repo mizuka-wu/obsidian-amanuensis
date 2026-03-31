@@ -1,10 +1,11 @@
-import { Plugin } from "obsidian";
+import { Plugin, Notice } from "obsidian";
 import { AmanuensisServer } from "./server";
 import {
 	DEFAULT_SETTINGS,
 	AmanuensisPluginSettings,
 	AmanuensisSettingTab,
 } from "./settings";
+import { validatePort, getPortErrorMessage } from "./utils/port-validator";
 
 // Remember to rename these classes and interfaces!
 
@@ -19,8 +20,13 @@ export default class AmanuensisPlugin extends Plugin {
 		this.addSettingTab(new AmanuensisSettingTab(this.app, this));
 
 		// Start the server
+		const port = validatePort(this.settings.port);
+		if (port === null) {
+			throw new Error(getPortErrorMessage(this.settings.port));
+		}
+
 		this.server = await AmanuensisServer.create({
-			port: +this.settings.port,
+			port: port,
 		});
 
 		await this.server.start();
@@ -33,12 +39,26 @@ export default class AmanuensisPlugin extends Plugin {
 		}
 	}
 
+	async restartServer(): Promise<void> {
+		if (this.server) {
+			const port = validatePort(this.settings.port);
+			if (port === null) {
+				new Notice(getPortErrorMessage(this.settings.port));
+				return;
+			}
+			await this.server.stop();
+			await this.server.start(port);
+			new Notice(`服务器已重启，端口: ${port}`);
+		}
+	}
+
 	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			(await this.loadData()) as Partial<AmanuensisPluginSettings>,
-		);
+		const loadedData = ((await this.loadData()) ||
+			{}) as Partial<AmanuensisPluginSettings>;
+		this.settings = {
+			...DEFAULT_SETTINGS,
+			...loadedData,
+		};
 	}
 
 	async saveSettings() {
