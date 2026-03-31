@@ -24,6 +24,30 @@ class ProviderModal extends Modal {
 	baseUrlInput: TextComponent;
 	apiKeyInput: TextComponent;
 
+	// 缓存各类型的输入值
+	private inputCache: Record<
+		ProviderType,
+		{ name: string; baseUrl: string; apiKey: string }
+	> = {
+		openai: { name: "", baseUrl: "", apiKey: "" },
+		anthropic: { name: "", baseUrl: "", apiKey: "" },
+		ollama: { name: "", baseUrl: "", apiKey: "" },
+		lmstudio: { name: "", baseUrl: "", apiKey: "" },
+		custom: { name: "", baseUrl: "", apiKey: "" },
+	};
+
+	// 记录用户是否主动输入过
+	private userInputted: Record<
+		ProviderType,
+		{ name: boolean; baseUrl: boolean }
+	> = {
+		openai: { name: false, baseUrl: false },
+		anthropic: { name: false, baseUrl: false },
+		ollama: { name: false, baseUrl: false },
+		lmstudio: { name: false, baseUrl: false },
+		custom: { name: false, baseUrl: false },
+	};
+
 	constructor(
 		app: App,
 		plugin: AmanuensisPlugin,
@@ -59,6 +83,15 @@ class ProviderModal extends Modal {
 				text.setPlaceholder(CONST.PROVIDER_NAME_PLACEHOLDER).setValue(
 					this.provider?.name || "",
 				);
+				text.inputEl.addClass("provider-input");
+				text.onChange((value) => {
+					const currentType =
+						this.typeDropdown.getValue() as ProviderType;
+					this.inputCache[currentType].name = value;
+					if (value.trim()) {
+						this.userInputted[currentType].name = true;
+					}
+				});
 			});
 
 		new Setting(contentEl)
@@ -86,6 +119,15 @@ class ProviderModal extends Modal {
 				text.setPlaceholder(
 					CONST.PROVIDER_BASEURL_PLACEHOLDER,
 				).setValue(this.provider?.baseUrl || "");
+				text.inputEl.addClass("provider-input");
+				text.onChange((value) => {
+					const currentType =
+						this.typeDropdown.getValue() as ProviderType;
+					this.inputCache[currentType].baseUrl = value;
+					if (value.trim()) {
+						this.userInputted[currentType].baseUrl = true;
+					}
+				});
 			});
 
 		new Setting(contentEl)
@@ -97,6 +139,12 @@ class ProviderModal extends Modal {
 					this.provider?.apiKey || "",
 				);
 				text.inputEl.type = "password";
+				text.inputEl.addClass("provider-input");
+				text.onChange((value) => {
+					const currentType =
+						this.typeDropdown.getValue() as ProviderType;
+					this.inputCache[currentType].apiKey = value;
+				});
 			});
 
 		// 如果是新增 Provider，自动填充默认值
@@ -122,19 +170,31 @@ class ProviderModal extends Modal {
 
 	private onTypeChange(type: ProviderType): void {
 		const defaults = getProviderDefaults(type);
+		const cache = this.inputCache[type];
+		const inputted = this.userInputted[type];
 
-		// 如果名称为空，填充默认名称
-		if (!this.nameInput.getValue().trim()) {
+		// 恢复或填充名称
+		if (cache.name) {
+			// 如果有缓存值，恢复缓存
+			this.nameInput.setValue(cache.name);
+		} else if (!inputted.name) {
+			// 如果用户未输入过，填充默认值
 			this.nameInput.setValue(defaults.defaultName);
 		}
 
-		// 如果 Base URL 为空，填充默认 Base URL
-		if (!this.baseUrlInput.getValue().trim()) {
+		// 恢复或填充 Base URL
+		if (cache.baseUrl) {
+			// 如果有缓存值，恢复缓存
+			this.baseUrlInput.setValue(cache.baseUrl);
+		} else if (!inputted.baseUrl) {
+			// 如果用户未输入过，填充默认值
 			this.baseUrlInput.setValue(defaults.defaultBaseUrl);
 		}
 
-		// 根据类型决定是否需要 API Key
-		if (!defaults.requiresApiKey) {
+		// 恢复或清空 API Key
+		if (cache.apiKey) {
+			this.apiKeyInput.setValue(cache.apiKey);
+		} else if (!defaults.requiresApiKey) {
 			this.apiKeyInput.setValue("");
 		}
 	}

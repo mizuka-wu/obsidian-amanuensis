@@ -298,6 +298,10 @@ input:checked + .amanuensis-toggle-slider:before {
 	cursor: not-allowed;
 }
 
+.provider-input {
+	width: min(100%, 220px);
+}
+
 /* ============================================
    Responsive Adjustments
    ============================================ */
