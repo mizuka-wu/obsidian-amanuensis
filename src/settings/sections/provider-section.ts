@@ -12,6 +12,7 @@ import type { ProviderProfile, ProviderType } from "../../types/settings";
 import { generateUUID } from "../../utils/uuid";
 import * as CONST from "../../const";
 import { ConfirmModal } from "../../settings";
+import { getProviderDefaults } from "../provider-defaults";
 
 class ProviderModal extends Modal {
 	plugin: AmanuensisPlugin;
@@ -70,7 +71,11 @@ class ProviderModal extends Modal {
 						dropdown.addOption(key, value);
 					},
 				);
-				dropdown.setValue(this.provider?.type || "openai");
+				const currentType = this.provider?.type || "openai";
+				dropdown.setValue(currentType);
+				dropdown.onChange((value) => {
+					this.onTypeChange(value as ProviderType);
+				});
 			});
 
 		new Setting(contentEl)
@@ -94,6 +99,12 @@ class ProviderModal extends Modal {
 				text.inputEl.type = "password";
 			});
 
+		// 如果是新增 Provider，自动填充默认值
+		if (!this.provider) {
+			const defaultType = "openai" as ProviderType;
+			this.onTypeChange(defaultType);
+		}
+
 		new Setting(contentEl)
 			.addButton((btn) => {
 				btn.setButtonText(CONST.PROVIDER_MODAL_CANCEL).onClick(() => {
@@ -107,6 +118,25 @@ class ProviderModal extends Modal {
 						await this.save();
 					});
 			});
+	}
+
+	private onTypeChange(type: ProviderType): void {
+		const defaults = getProviderDefaults(type);
+
+		// 如果名称为空，填充默认名称
+		if (!this.nameInput.getValue().trim()) {
+			this.nameInput.setValue(defaults.defaultName);
+		}
+
+		// 如果 Base URL 为空，填充默认 Base URL
+		if (!this.baseUrlInput.getValue().trim()) {
+			this.baseUrlInput.setValue(defaults.defaultBaseUrl);
+		}
+
+		// 根据类型决定是否需要 API Key
+		if (!defaults.requiresApiKey) {
+			this.apiKeyInput.setValue("");
+		}
 	}
 
 	async save(): Promise<void> {

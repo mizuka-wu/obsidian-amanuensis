@@ -37,6 +37,7 @@ export const PROVIDER_VALIDATION_EMPTY = "名称和 Base URL 不能为空";
 export const PROVIDER_VALIDATION_URL_INVALID =
 	"Base URL 格式无效，请输入有效的 URL（例如: https://api.openai.com/v1）";
 export const PROVIDER_SAVE_ERROR = "保存 Provider 失败，请查看控制台了解详情";
+export const PROVIDER_CUSTOM_DESC = "需要 OpenAI 兼容格式的 API";
 
 // Model 相关
 export const MODEL_SECTION_TITLE = "模型菜单 (Models)";
