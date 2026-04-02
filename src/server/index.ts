@@ -83,8 +83,11 @@ export class AmanuensisServer {
 		this._serverInstance = await new Promise((resolve, reject) => {
 			const server = this.expressApplication.listen(port, (error) => {
 				if (error) {
-					this._lastError = error as Error;
-					reject(error as Error);
+					this._lastError =
+						error instanceof Error
+							? error
+							: new Error(String(error));
+					reject(this._lastError);
 				} else {
 					resolve(server);
 				}

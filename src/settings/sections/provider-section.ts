@@ -12,7 +12,7 @@ import type { ProviderProfile, ProviderType } from "../../types/settings";
 import { generateUUID } from "../../utils/uuid";
 import * as CONST from "../../const";
 import { ConfirmModal } from "../../settings";
-import { getProviderDefaults } from "../provider-defaults";
+import { getProviderConfig } from "../../providers";
 
 class ProviderModal extends Modal {
 	plugin: AmanuensisPlugin;
@@ -169,7 +169,7 @@ class ProviderModal extends Modal {
 	}
 
 	private onTypeChange(type: ProviderType): void {
-		const defaults = getProviderDefaults(type);
+		const defaults = getProviderConfig(type);
 		const cache = this.inputCache[type];
 		const inputted = this.userInputted[type];
 

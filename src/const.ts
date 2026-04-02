@@ -66,8 +66,21 @@ export const MODEL_MODAL_NO_PROVIDERS =
 	"没有可用的 Provider，请先添加至少一个 Provider。";
 export const MODEL_MODAL_CANCEL = "取消";
 export const MODEL_MODAL_ADD = "添加";
+export const MODEL_BATCH_ADD = "批量添加选中";
+export const MODEL_BATCH_LOADING = "正在加载模型列表...";
+export const MODEL_BATCH_EMPTY = "该 Provider 没有可用的模型";
+export const MODEL_BATCH_ERROR = "加载模型列表失败";
+export const MODEL_BATCH_UNSUPPORTED = "该 provider 类型不支持批量导入";
+export const MODEL_BATCH_ALL_ADDED = "所有模型都已添加";
+export const MODEL_BATCH_SELECT_ALL = "全选";
+export const MODEL_BATCH_DESELECT_ALL = "取消全选";
+export const MODEL_BATCH_TITLE = "批量导入";
 export const MODEL_VALIDATION_EMPTY = "所有字段都不能为空";
 export const MODEL_SAVE_ERROR = "添加模型失败，请查看控制台了解详情";
+export const MODEL_BATCH_SUCCESS = (count: number) =>
+	`成功添加 ${count} 个模型`;
+export const MODEL_BATCH_PARTIAL = (success: number, failed: number) =>
+	`添加完成：成功 ${success} 个，失败 ${failed} 个`;
 
 // Provider 类型选项
 export const PROVIDER_TYPE_OPTIONS = {

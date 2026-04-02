@@ -320,3 +320,74 @@ input:checked + .amanuensis-toggle-slider:before {
 		justify-content: flex-end;
 	}
 }
+
+/* ============================================
+   Model Batch Import
+   ============================================ */
+
+.model-single-add-section {
+	margin-bottom: 16px;
+}
+
+.model-batch-divider {
+	margin: 20px 0;
+	border: none;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.model-batch-section {
+	margin-bottom: 16px;
+}
+
+.model-batch-section h3 {
+	margin: 0 0 12px 0;
+	font-size: 1em;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.model-batch-buttons-row {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.model-batch-buttons-row button {
+	padding: 6px 12px;
+	font-size: 0.9em;
+}
+
+.model-batch-list {
+	max-height: 200px;
+	overflow-y: auto;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	padding: 8px;
+	background-color: var(--background-primary);
+}
+
+.model-batch-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 6px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.model-batch-item:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.model-batch-checkbox {
+	width: 16px;
+	height: 16px;
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.model-batch-name {
+	font-size: 0.95em;
+	color: var(--text-normal);
+	word-break: break-all;
+}

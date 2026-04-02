@@ -1,25 +1,6 @@
-import { requestUrl } from "obsidian";
 import type { ProviderProfile, ProviderType } from "../types/settings";
 import { generateUUID } from "../utils/uuid";
-
-interface OllamaModel {
-	name: string;
-	model: string;
-}
-
-interface OllamaResponse {
-	models?: OllamaModel[];
-}
-
-interface LMStudioModel {
-	key: string;
-	display_name: string;
-	type: string;
-}
-
-interface LMStudioResponse {
-	models?: LMStudioModel[];
-}
+import { fetchProviderModels, type FetchedModel } from "../providers";
 
 export class ProviderManager {
 	private providers: Record<string, ProviderProfile>;
@@ -83,76 +64,13 @@ export class ProviderManager {
 		return { ...this.providers };
 	}
 
-	async fetchOllamaModels(
-		baseUrl: string,
-	): Promise<{ name: string; model: string }[]> {
-		try {
-			const response = await requestUrl({
-				url: new URL("/api/tags", baseUrl).href,
-				method: "GET",
-			});
-			const data = response.json as OllamaResponse;
-			return (
-				data.models?.map((m) => ({
-					name: m.name,
-					model: m.model,
-				})) || []
-			);
-		} catch (error) {
-			console.error("Error fetching Ollama models:", error);
-			return [];
-		}
-	}
-
-	async fetchLMStudioModels(
-		baseUrl: string,
-	): Promise<{ key: string; display_name: string }[]> {
-		try {
-			const response = await requestUrl({
-				url: new URL("/api/v1/models", baseUrl).href,
-				method: "GET",
-			});
-			const data = response.json as LMStudioResponse;
-			const llmModels =
-				data.models?.filter((m) => m.type === "llm") || [];
-			return llmModels.map((m) => ({
-				key: m.key,
-				display_name: m.display_name,
-			}));
-		} catch (error) {
-			console.error("Error fetching LM Studio models:", error);
-			return [];
-		}
-	}
-
+	/**
+	 * 获取 Provider 的可用模型列表
+	 * 使用新的 providers 模块
+	 */
 	async getProviderModels(
 		provider: ProviderProfile,
-	): Promise<{ id: string; name: string }[]> {
-		const results: { id: string; name: string }[] = [];
-
-		switch (provider.type) {
-			case "ollama": {
-				const ollamaModels = await this.fetchOllamaModels(
-					provider.baseUrl,
-				);
-				ollamaModels.forEach((m) =>
-					results.push({ id: m.name, name: m.name }),
-				);
-				break;
-			}
-			case "lmstudio": {
-				const lmModels = await this.fetchLMStudioModels(
-					provider.baseUrl,
-				);
-				lmModels.forEach((m) =>
-					results.push({ id: m.key, name: m.display_name || m.key }),
-				);
-				break;
-			}
-			default:
-				break;
-		}
-
-		return results;
+	): Promise<FetchedModel[]> {
+		return await fetchProviderModels(provider.type, provider);
 	}
 }
