@@ -830,7 +830,11 @@ class AddModelModal extends Modal {
 				cls: "pending-model-id",
 			});
 
-			const actions = item.createEl("div", {
+			const actionsContainer = item.createEl("div", {
+				cls: "pending-model-actions-container",
+			});
+
+			const actions = actionsContainer.createEl("div", {
 				cls: "pending-model-actions",
 			});
 
