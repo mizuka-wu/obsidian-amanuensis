@@ -1,11 +1,10 @@
 import {
 	Setting,
 	Modal,
-	DropdownComponent,
-	TextComponent,
 	Notice,
 	App,
 	ButtonComponent,
+	getIcon,
 } from "obsidian";
 import type AmanuensisPlugin from "../../main";
 import { ModelManager } from "../model-manager";
@@ -15,31 +14,323 @@ import { supportsBatchImport, type FetchedModel } from "../../providers";
 import * as CONST from "../../const";
 import { ConfirmModal } from "../../settings";
 
+// 待添加的模型项
+interface PendingModel {
+	id: string; // 临时ID，用于列表管理
+	name: string;
+	modelId: string;
+	providerId: string;
+	providerName: string;
+	description: string; // 模型功能描述
+	supportsToolUse: boolean; // 是否支持 tool use
+}
+
+// 手动输入模型时询问名称的弹窗
+class ModelNameInputModal extends Modal {
+	modelId: string;
+	onConfirm: (
+		name: string,
+		description: string,
+		supportsToolUse: boolean,
+	) => void;
+	nameInput: HTMLInputElement | null = null;
+	descriptionInput: HTMLInputElement | null = null;
+	supportsToolUseInput: HTMLInputElement | null = null;
+
+	constructor(
+		app: App,
+		modelId: string,
+		onConfirm: (
+			name: string,
+			description: string,
+			supportsToolUse: boolean,
+		) => void,
+	) {
+		super(app);
+		this.modelId = modelId;
+		this.onConfirm = onConfirm;
+	}
+
+	onOpen(): void {
+		const { contentEl } = this;
+		contentEl.empty();
+
+		this.titleEl.setText("输入模型名称");
+
+		// 显示模型 ID
+		contentEl.createEl("p", {
+			text: `模型 ID: ${this.modelId}`,
+			cls: "setting-item-description",
+		});
+
+		// 名称输入
+		const nameContainer = contentEl.createEl("div", {
+			cls: "model-name-input-container",
+		});
+		this.nameInput = nameContainer.createEl("input", {
+			type: "text",
+			cls: "model-name-input",
+			placeholder: "输入模型显示名称",
+		});
+
+		// 功能描述输入
+		const descContainer = contentEl.createEl("div", {
+			cls: "model-name-input-container",
+		});
+		descContainer.createEl("label", {
+			text: "功能描述（可选）:",
+			cls: "setting-item-description",
+		});
+		this.descriptionInput = descContainer.createEl("input", {
+			type: "text",
+			cls: "model-name-input",
+			placeholder: "描述此模型的功能，如：适合代码补全、长文本生成等",
+		});
+
+		// tool use 支持
+		const toolUseContainer = contentEl.createEl("div", {
+			cls: "model-name-input-container",
+		});
+		const toolUseLabel = toolUseContainer.createEl("label", {
+			cls: "checkbox-container",
+		});
+		this.supportsToolUseInput = toolUseLabel.createEl("input", {
+			type: "checkbox",
+		});
+		toolUseLabel.appendText(" 支持 tool use（函数调用）");
+
+		// 默认填入 modelId
+		this.nameInput.value = this.modelId;
+		this.nameInput.focus();
+
+		// 按钮行
+		const buttonRow = contentEl.createEl("div", {
+			cls: "modal-button-row",
+		});
+
+		const cancelBtn = buttonRow.createEl("button", {
+			text: "取消",
+		});
+		cancelBtn.addEventListener("click", () => {
+			this.close();
+		});
+
+		const confirmBtn = buttonRow.createEl("button", {
+			cls: "mod-cta",
+			text: "确定",
+		});
+		confirmBtn.addEventListener("click", () => {
+			const name = this.nameInput?.value.trim();
+			const description = this.descriptionInput?.value.trim() || "";
+			const supportsToolUse = this.supportsToolUseInput?.checked || false;
+			if (name) {
+				this.onConfirm(name, description, supportsToolUse);
+				this.close();
+			}
+		});
+	}
+
+	onClose(): void {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
+
+// 模型选择下拉/弹窗组件
+class ModelSelectorModal extends Modal {
+	plugin: AmanuensisPlugin;
+	onSelect: (model: FetchedModel) => void;
+	provider: ProviderProfile;
+	providerManager: ProviderManager;
+	modelManager: ModelManager;
+	existingModelIds: Set<string>;
+
+	availableModels: FetchedModel[] = [];
+	modelsContainer: HTMLElement | null = null;
+	searchInput: HTMLInputElement | null = null;
+
+	private loadModelsRequestId: number = 0;
+
+	constructor(
+		app: App,
+		plugin: AmanuensisPlugin,
+		provider: ProviderProfile,
+		existingModelIds: Set<string>,
+		onSelect: (model: FetchedModel) => void,
+	) {
+		super(app);
+		this.plugin = plugin;
+		this.provider = provider;
+		this.existingModelIds = existingModelIds;
+		this.onSelect = onSelect;
+		this.providerManager = new ProviderManager(plugin.settings.providers);
+		this.modelManager = new ModelManager(
+			plugin.settings.models,
+			plugin.settings.defaultModelId,
+		);
+	}
+
+	onOpen(): void {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.addClass("model-selector-modal");
+
+		this.titleEl.setText(`选择模型 - ${this.provider.name}`);
+
+		// 搜索框
+		const searchContainer = contentEl.createEl("div", {
+			cls: "model-selector-search",
+		});
+		this.searchInput = searchContainer.createEl("input", {
+			type: "text",
+			cls: "model-selector-input",
+			placeholder: "搜索模型...",
+		});
+
+		// 模型列表容器
+		this.modelsContainer = contentEl.createEl("div", {
+			cls: "model-selector-list",
+		});
+
+		// 加载模型
+		void this.loadModels();
+
+		// 搜索功能
+		this.searchInput.addEventListener("input", () => {
+			this.filterModels();
+		});
+	}
+
+	private async loadModels(): Promise<void> {
+		if (!this.modelsContainer) return;
+
+		const currentRequestId = ++this.loadModelsRequestId;
+
+		// 显示加载中
+		this.modelsContainer.empty();
+		const loadingEl = this.modelsContainer.createEl("div", {
+			cls: "model-selector-loading",
+			text: "加载中...",
+		});
+
+		try {
+			if (!supportsBatchImport(this.provider.type)) {
+				loadingEl.setText("此来源不支持获取模型列表");
+				return;
+			}
+
+			const models = await this.providerManager.getProviderModels(
+				this.provider,
+			);
+
+			if (currentRequestId !== this.loadModelsRequestId) return;
+
+			// 过滤已存在的模型
+			this.availableModels = models.filter(
+				(m) => !this.existingModelIds.has(m.id),
+			);
+
+			loadingEl.remove();
+
+			if (this.availableModels.length === 0) {
+				this.modelsContainer.createEl("div", {
+					cls: "model-selector-empty",
+					text: "没有可用模型",
+				});
+				return;
+			}
+
+			this.renderModelList();
+		} catch (error) {
+			if (currentRequestId !== this.loadModelsRequestId) return;
+			loadingEl.setText(
+				`加载失败: ${error instanceof Error ? error.message : "未知错误"}`,
+			);
+		}
+	}
+
+	private renderModelList(): void {
+		if (!this.modelsContainer) return;
+		this.modelsContainer.empty();
+
+		this.availableModels.forEach((model) => {
+			const item = this.modelsContainer!.createEl("div", {
+				cls: "model-selector-item",
+			});
+
+			item.createEl("span", {
+				text: model.name,
+				cls: "model-selector-name",
+			});
+
+			item.createEl("span", {
+				text: model.id,
+				cls: "model-selector-id",
+			});
+
+			item.addEventListener("click", () => {
+				this.onSelect(model);
+				this.close();
+			});
+		});
+	}
+
+	private filterModels(): void {
+		if (!this.searchInput || !this.modelsContainer) return;
+
+		const query = this.searchInput.value.toLowerCase();
+		const items = this.modelsContainer.querySelectorAll(
+			".model-selector-item",
+		);
+
+		items.forEach((item) => {
+			const nameEl = item.querySelector(".model-selector-name");
+			const idEl = item.querySelector(".model-selector-id");
+			const text =
+				(nameEl?.textContent || "") + (idEl?.textContent || "");
+			(item as HTMLElement).style.display = text
+				.toLowerCase()
+				.includes(query)
+				? ""
+				: "none";
+		});
+	}
+
+	onClose(): void {
+		this.loadModelsRequestId++;
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
+
 class AddModelModal extends Modal {
 	plugin: AmanuensisPlugin;
 	onSave: (
 		models: { name: string; modelId: string; providerId: string }[],
 	) => Promise<void>;
 
-	providerDropdown: DropdownComponent;
-	nameInput: TextComponent;
-	modelIdInput: TextComponent;
 	providerManager: ProviderManager;
 	modelManager: ModelManager;
 
-	// 批量导入相关
-	batchModelsContainer: HTMLElement | null = null;
-	selectedModels: Set<string> = new Set();
-	availableModels: FetchedModel[] = [];
+	// 待添加模型列表
+	pendingModels: PendingModel[] = [];
+	pendingListContainer: HTMLElement | null = null;
+
+	// 当前选择的provider和模型
 	currentProvider: ProviderProfile | null = null;
-	batchAddButton: ButtonComponent | null = null;
-	// 竞态条件防护 - 使用简单标志
+	selectedModel: FetchedModel | null = null;
+
+	// 输入框和下拉列表
+	modelInputContainer: HTMLElement | null = null;
+	modelInput: HTMLInputElement | null = null;
+	modelDropdown: HTMLElement | null = null;
+	addButton: HTMLButtonElement | null = null;
+
+	// 可用的模型列表
+	availableModels: FetchedModel[] = [];
 	private loadModelsRequestId: number = 0;
-	// checkbox 事件监听器清理
-	private checkboxListeners: Array<{
-		element: HTMLInputElement;
-		listener: EventListener;
-	}> = [];
+
+	confirmButton: ButtonComponent | null = null;
 
 	constructor(
 		app: App,
@@ -66,6 +357,7 @@ class AddModelModal extends Modal {
 	onOpen(): void {
 		const { contentEl } = this;
 		contentEl.empty();
+		this.pendingModels = [];
 
 		this.titleEl.setText(CONST.MODEL_MODAL_TITLE);
 
@@ -79,322 +371,420 @@ class AddModelModal extends Modal {
 			return;
 		}
 
-		// Provider 选择
+		// 待添加模型列表区域（顶部）
+		this.pendingListContainer = contentEl.createEl("div", {
+			cls: "pending-models-section",
+		});
+
+		// 初始渲染空列表提示
+		this.renderPendingList();
+
+		// 分割线
+		contentEl.createEl("hr", { cls: "model-add-divider" });
+
+		// 底部添加区域 - 水平布局
+		const addSection = contentEl.createEl("div", {
+			cls: "model-add-section",
+		});
+
+		// Provider 选择器
+		const providerContainer = addSection.createEl("div", {
+			cls: "model-add-provider",
+		});
+
+		const providerSelect = providerContainer.createEl("select", {
+			cls: "dropdown",
+		});
+		providers.forEach((provider) => {
+			providerSelect.createEl("option", {
+				value: provider.id,
+				text: `${provider.name} (${provider.type})`,
+			});
+		});
+
+		// 选择第一个 provider
+		if (providers.length > 0) {
+			this.currentProvider = providers[0] ?? null;
+		}
+
+		providerSelect.addEventListener("change", () => {
+			const providerId = providerSelect.value;
+			const provider = this.providerManager.getProviderById(providerId);
+			this.currentProvider = provider ?? null;
+			// 切换 provider 时清空当前选择的模型
+			this.selectedModel = null;
+			if (this.modelInput) {
+				this.modelInput.value = "";
+				this.modelInput.placeholder = "点击选择或输入 id";
+			}
+			this.updateAddButton();
+		});
+
+		// 模型选择输入框（带 autocomplete 下拉）
+		this.modelInputContainer = addSection.createEl("div", {
+			cls: "model-add-input-container",
+		});
+
+		// 输入框
+		this.modelInput = this.modelInputContainer.createEl("input", {
+			type: "text",
+			cls: "model-add-input",
+			placeholder: "点击选择或输入 id",
+		});
+
+		// 下拉列表容器（初始隐藏）
+		this.modelDropdown = this.modelInputContainer.createEl("div", {
+			cls: "model-autocomplete-dropdown is-hidden",
+		});
+
+		// 监听输入框焦点
+		this.modelInput.addEventListener("focus", () => {
+			if (!this.currentProvider) {
+				new Notice("请先选择 provider");
+				this.modelInput?.blur();
+				return;
+			}
+			void this.loadAndShowModels();
+		});
+
+		// 监听输入变化（过滤）
+		this.modelInput.addEventListener("input", () => {
+			this.updateAddButton();
+			this.filterModelDropdown();
+		});
+
+		// 点击外部关闭下拉
+		document.addEventListener("click", (e) => {
+			if (
+				this.modelInputContainer &&
+				!this.modelInputContainer.contains(e.target as Node)
+			) {
+				this.hideModelDropdown();
+			}
+		});
+
+		// 添加按钮
+		const addBtnContainer = addSection.createEl("div", {
+			cls: "model-add-button-container",
+		});
+		this.addButton = addBtnContainer.createEl("button", {
+			cls: "mod-cta",
+			text: "添加",
+		});
+		this.addButton.disabled = true;
+		this.addButton.addEventListener("click", () => {
+			if (!this.currentProvider || !this.modelInput) return;
+
+			const inputValue = this.modelInput.value.trim();
+			if (!inputValue) return;
+
+			// 如果是从选择器选择的模型
+			if (this.selectedModel && this.selectedModel.id === inputValue) {
+				this.addPendingModel(
+					this.selectedModel.name,
+					this.selectedModel.id,
+					"", // 从列表选择的模型，描述为空
+					false, // 默认不支持 tool use，需要用户后续编辑
+				);
+				// 清空选择
+				this.selectedModel = null;
+				this.modelInput.value = "";
+				this.updateAddButton();
+			} else {
+				// 手动输入的情况，弹出窗口询问名称和详细信息
+				new ModelNameInputModal(
+					this.app,
+					inputValue,
+					(name, description, supportsToolUse) => {
+						this.addPendingModel(
+							name,
+							inputValue,
+							description,
+							supportsToolUse,
+						);
+						this.selectedModel = null;
+						this.modelInput!.value = "";
+						this.updateAddButton();
+					},
+				).open();
+			}
+		});
+
+		// 底部按钮区域 - 使用 Setting 类，与 Provider 编辑保持一致
 		new Setting(contentEl)
-			.setName(CONST.MODEL_PROVIDER_LABEL)
-			.setDesc(CONST.MODEL_PROVIDER_DESC)
-			.addDropdown((dropdown) => {
-				this.providerDropdown = dropdown;
-				providers.forEach((provider) => {
-					dropdown.addOption(
-						provider.id,
-						`${provider.name} (${provider.type})`,
-					);
+			.addButton((btn) => {
+				btn.setButtonText(CONST.MODEL_MODAL_CANCEL).onClick(() => {
+					this.close();
 				});
-				// 选择第一个 provider
-				const firstProvider = providers[0];
-				if (firstProvider) {
-					dropdown.setValue(firstProvider.id);
-					this.currentProvider = firstProvider;
-					// 加载模型列表
-					this.loadModelsForProvider(firstProvider).catch((error) => {
-						console.error("Failed to load initial models:", error);
+			})
+			.addButton((btn) => {
+				btn.setButtonText("确定")
+					.setCta()
+					.setDisabled(true)
+					.onClick(() => {
+						void this.saveAll();
 					});
-				}
-
-				dropdown.onChange(async (value) => {
-					const provider =
-						this.providerManager.getProviderById(value);
-					if (provider) {
-						this.currentProvider = provider;
-						dropdown.setDisabled(true);
-						try {
-							await this.loadModelsForProvider(provider);
-						} finally {
-							dropdown.setDisabled(false);
-						}
-					}
-				});
+				this.confirmButton = btn;
 			});
-
-		// 单个添加区域
-		const singleAddSection = contentEl.createEl("div", {
-			cls: "model-single-add-section",
-		});
-
-		new Setting(singleAddSection)
-			.setName(CONST.MODEL_NAME_LABEL)
-			.setDesc(CONST.MODEL_NAME_DESC)
-			.addText((text) => {
-				this.nameInput = text;
-				text.setPlaceholder(CONST.MODEL_NAME_PLACEHOLDER);
-			});
-
-		new Setting(singleAddSection)
-			.setName(CONST.MODEL_ID_LABEL)
-			.setDesc(CONST.MODEL_ID_DESC)
-			.addText((text) => {
-				this.modelIdInput = text;
-				text.setPlaceholder(CONST.MODEL_ID_PLACEHOLDER);
-			});
-
-		new Setting(singleAddSection).addButton((btn) => {
-			btn.setButtonText(CONST.MODEL_MODAL_ADD)
-				.setCta()
-				.onClick(async () => {
-					await this.saveSingle();
-				});
-		});
-
-		// 分隔线
-		contentEl.createEl("hr", { cls: "model-batch-divider" });
-
-		// 批量导入区域
-		const batchSection = contentEl.createEl("div", {
-			cls: "model-batch-section",
-		});
-
-		batchSection.createEl("h3", { text: CONST.MODEL_BATCH_TITLE });
-
-		// 批量操作按钮
-		const batchButtonsRow = new Setting(batchSection);
-		batchButtonsRow.settingEl.empty();
-		batchButtonsRow.settingEl.addClass("model-batch-buttons-row");
-
-		batchButtonsRow.addButton((btn) => {
-			btn.setButtonText(CONST.MODEL_BATCH_SELECT_ALL)
-				.setCta()
-				.onClick(() => {
-					this.selectAllModels();
-				});
-		});
-
-		batchButtonsRow.addButton((btn) => {
-			btn.setButtonText(CONST.MODEL_BATCH_DESELECT_ALL).onClick(() => {
-				this.deselectAllModels();
-			});
-		});
-
-		// 模型列表容器
-		this.batchModelsContainer = batchSection.createEl("div", {
-			cls: "model-batch-list",
-		});
-
-		// 批量添加按钮
-		new Setting(contentEl).addButton((btn) => {
-			btn.setButtonText(CONST.MODEL_BATCH_ADD)
-				.setCta()
-				.setDisabled(true)
-				.onClick(async () => {
-					await this.saveBatch();
-				});
-			this.batchAddButton = btn;
-		});
-
-		// 取消按钮
-		new Setting(contentEl).addButton((btn) => {
-			btn.setButtonText(CONST.MODEL_MODAL_CANCEL).onClick(() => {
-				this.close();
-			});
-		});
 	}
 
-	private async loadModelsForProvider(
-		provider: ProviderProfile,
-	): Promise<void> {
-		if (!this.batchModelsContainer) return;
+	private updateAddButton(): void {
+		if (this.addButton && this.modelInput) {
+			// 有输入内容就启用添加按钮
+			this.addButton.disabled = !this.modelInput.value.trim();
+		}
+	}
 
-		// 生成新的请求 ID 并保存
-		const currentRequestId = ++this.loadModelsRequestId;
-
-		// 清空容器
-		this.batchModelsContainer.empty();
-		this.selectedModels.clear();
-		this.availableModels = [];
-		this.updateBatchButtonState();
+	private async loadAndShowModels(): Promise<void> {
+		if (!this.modelDropdown || !this.currentProvider) return;
 
 		// 显示加载中
-		const loadingEl = this.batchModelsContainer.createEl("p", {
-			text: CONST.MODEL_BATCH_LOADING,
-			cls: "setting-item-description",
+		this.modelDropdown.empty();
+		this.modelDropdown.removeClass("is-hidden");
+		this.modelDropdown.createEl("div", {
+			cls: "model-autocomplete-loading",
+			text: "加载中...",
 		});
+
+		const currentRequestId = ++this.loadModelsRequestId;
 
 		try {
-			// 检查是否支持批量导入
-			if (!supportsBatchImport(provider.type)) {
-				loadingEl.setText(CONST.MODEL_BATCH_UNSUPPORTED);
-				return;
-			}
-
-			const models =
-				await this.providerManager.getProviderModels(provider);
-
-			// 检查是否是更新的请求，过期请求清理 DOM
-			if (currentRequestId !== this.loadModelsRequestId) {
-				loadingEl.remove();
-				return;
-			}
-
-			// 移除加载提示
-			loadingEl.remove();
-
-			if (models.length === 0) {
-				this.batchModelsContainer.createEl("p", {
-					text: CONST.MODEL_BATCH_EMPTY,
-					cls: "setting-item-description",
+			if (!supportsBatchImport(this.currentProvider.type)) {
+				this.modelDropdown.empty();
+				this.modelDropdown.createEl("div", {
+					cls: "model-autocomplete-empty",
+					text: "此来源不支持获取模型列表",
 				});
 				return;
 			}
+
+			const models = await this.providerManager.getProviderModels(
+				this.currentProvider,
+			);
+
+			if (currentRequestId !== this.loadModelsRequestId) return;
 
 			// 过滤已存在的模型
-			const existingModelIds = new Set(
-				this.modelManager
+			const existingIds = new Set([
+				...this.modelManager
 					.getAllModels()
-					.filter((m) => m.providerId === provider.id)
+					.filter((m) => m.providerId === this.currentProvider!.id)
 					.map((m) => m.modelId),
-			);
+				...this.pendingModels
+					.filter((m) => m.providerId === this.currentProvider!.id)
+					.map((m) => m.modelId),
+			]);
 
-			this.availableModels = models.filter(
-				(m) => !existingModelIds.has(m.id),
-			);
+			this.availableModels = models.filter((m) => !existingIds.has(m.id));
 
-			if (this.availableModels.length === 0) {
-				this.batchModelsContainer.createEl("p", {
-					text: CONST.MODEL_BATCH_ALL_ADDED,
-					cls: "setting-item-description",
-				});
-				return;
-			}
-
-			// 渲染模型列表
-			this.renderModelList();
+			this.renderModelDropdown();
 		} catch (error) {
-			// 检查是否是过期的请求
-			if (currentRequestId !== this.loadModelsRequestId) {
-				return;
-			}
-			console.error("Failed to load models:", error);
-			// 检查 loadingEl 是否还在 DOM 中（可能被竞态条件清除）
-			if (loadingEl.parentNode) {
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				loadingEl.setText(
-					`${CONST.MODEL_BATCH_ERROR}: ${errorMessage}`,
-				);
-			}
+			if (currentRequestId !== this.loadModelsRequestId) return;
+			this.modelDropdown.empty();
+			this.modelDropdown.createEl("div", {
+				cls: "model-autocomplete-empty",
+				text: "加载失败",
+			});
 		}
 	}
 
-	private renderModelList(): void {
-		if (!this.batchModelsContainer) return;
+	private renderModelDropdown(): void {
+		if (!this.modelDropdown) return;
+		this.modelDropdown.empty();
 
-		// 清理旧的 checkbox 监听器
-		this.checkboxListeners.forEach(({ element, listener }) => {
-			element.removeEventListener("change", listener);
-		});
-		this.checkboxListeners = [];
-
-		// 注意：batchModelsContainer 已经在 loadModelsForProvider 中被清空了
-		// 这里只需直接渲染模型列表
-
-		this.availableModels.forEach((model) => {
-			const item = this.batchModelsContainer!.createEl("div", {
-				cls: "model-batch-item",
+		if (this.availableModels.length === 0) {
+			this.modelDropdown.createEl("div", {
+				cls: "model-autocomplete-empty",
+				text: "没有可用模型",
 			});
-
-			const checkbox = item.createEl("input", {
-				type: "checkbox",
-				cls: "model-batch-checkbox",
-			});
-			// 使用 data-model-id 替代数组索引，更健壮
-			checkbox.dataset.modelId = model.id;
-
-			const listener = (e: Event) => {
-				if ((e.target as HTMLInputElement).checked) {
-					this.selectedModels.add(model.id);
-				} else {
-					this.selectedModels.delete(model.id);
-				}
-				this.updateBatchButtonState();
-			};
-			checkbox.addEventListener("change", listener);
-			this.checkboxListeners.push({ element: checkbox, listener });
-
-			item.createEl("span", {
-				text: model.name,
-				cls: "model-batch-name",
-			});
-		});
-	}
-
-	private selectAllModels(): void {
-		this.availableModels.forEach((m) => this.selectedModels.add(m.id));
-		this.updateCheckboxes();
-		this.updateBatchButtonState();
-	}
-
-	private deselectAllModels(): void {
-		this.selectedModels.clear();
-		this.updateCheckboxes();
-		this.updateBatchButtonState();
-	}
-
-	private updateCheckboxes(): void {
-		if (!this.batchModelsContainer) return;
-
-		const checkboxes = this.batchModelsContainer.querySelectorAll(
-			".model-batch-checkbox",
-		);
-
-		// 使用 data-model-id 而非数组索引，更健壮
-		checkboxes.forEach((checkboxEl) => {
-			const checkbox = checkboxEl as HTMLInputElement;
-			const modelId = checkbox.dataset.modelId;
-			if (modelId) {
-				checkbox.checked = this.selectedModels.has(modelId);
-			}
-		});
-	}
-
-	private updateBatchButtonState(): void {
-		if (this.batchAddButton) {
-			this.batchAddButton.setDisabled(this.selectedModels.size === 0);
-		}
-	}
-
-	private async saveSingle(): Promise<void> {
-		const providerId = this.providerDropdown.getValue();
-		const name = this.nameInput.getValue().trim();
-		const modelId = this.modelIdInput.getValue().trim();
-
-		if (!providerId || !name || !modelId) {
-			new Notice(
-				CONST.NOTICE_VALIDATION_ERROR_PREFIX +
-					CONST.MODEL_VALIDATION_EMPTY,
-			);
 			return;
 		}
 
-		try {
-			await this.onSave([{ name, modelId, providerId }]);
-			this.close();
-		} catch (error) {
-			console.error("Failed to add model:", error);
-			new Notice(CONST.MODEL_SAVE_ERROR);
+		this.availableModels.forEach((model) => {
+			const item = this.modelDropdown!.createEl("div", {
+				cls: "model-autocomplete-item",
+			});
+			item.createEl("span", {
+				text: model.name,
+				cls: "model-autocomplete-name",
+			});
+			item.createEl("span", {
+				text: model.id,
+				cls: "model-autocomplete-id",
+			});
+
+			item.addEventListener("click", () => {
+				this.selectedModel = model;
+				if (this.modelInput) {
+					this.modelInput.value = model.name;
+				}
+				this.hideModelDropdown();
+				this.updateAddButton();
+			});
+		});
+	}
+
+	private filterModelDropdown(): void {
+		if (!this.modelDropdown) return;
+
+		const query = this.modelInput?.value.toLowerCase() || "";
+		const items = this.modelDropdown.querySelectorAll(
+			".model-autocomplete-item",
+		);
+
+		items.forEach((item) => {
+			const nameEl = item.querySelector(".model-autocomplete-name");
+			const idEl = item.querySelector(".model-autocomplete-id");
+			const text =
+				(nameEl?.textContent || "") + (idEl?.textContent || "");
+			(item as HTMLElement).style.display = text
+				.toLowerCase()
+				.includes(query)
+				? ""
+				: "none";
+		});
+	}
+
+	private hideModelDropdown(): void {
+		this.modelDropdown?.addClass("is-hidden");
+	}
+
+	private updateConfirmButton(): void {
+		if (this.confirmButton) {
+			this.confirmButton.setDisabled(this.pendingModels.length === 0);
 		}
 	}
 
-	private async saveBatch(): Promise<void> {
-		if (!this.currentProvider || this.selectedModels.size === 0) return;
+	private addPendingModel(
+		name: string,
+		modelId: string,
+		description: string = "",
+		supportsToolUse: boolean = false,
+	): void {
+		if (!this.currentProvider) return;
 
-		const providerId = this.currentProvider.id;
-		const modelsToAdd = this.availableModels
-			.filter((m) => this.selectedModels.has(m.id))
-			.map((m) => ({
-				name: m.name,
-				modelId: m.id,
-				providerId,
-			}));
+		// 检查是否已存在
+		const exists = this.pendingModels.some(
+			(m) =>
+				m.modelId === modelId &&
+				m.providerId === this.currentProvider!.id,
+		);
+		if (exists) {
+			new Notice(`模型 "${name}" 已在待添加列表中`);
+			return;
+		}
+
+		const pendingModel: PendingModel = {
+			id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+			name,
+			modelId,
+			providerId: this.currentProvider.id,
+			providerName: this.currentProvider.name,
+			description,
+			supportsToolUse,
+		};
+
+		this.pendingModels.push(pendingModel);
+		this.renderPendingList();
+		this.updateConfirmButton();
+	}
+
+	private removePendingModel(id: string): void {
+		this.pendingModels = this.pendingModels.filter((m) => m.id !== id);
+		this.renderPendingList();
+		this.updateConfirmButton();
+	}
+
+	private renderPendingList(): void {
+		if (!this.pendingListContainer) return;
+
+		this.pendingListContainer.empty();
+
+		if (this.pendingModels.length === 0) {
+			this.pendingListContainer.createEl("div", {
+				cls: "pending-models-empty",
+				text: "暂无待添加模型",
+			});
+			return;
+		}
+
+		const listContainer = this.pendingListContainer.createEl("div", {
+			cls: "pending-models-list-header",
+		});
+		listContainer.createEl("span", {
+			text: "名称",
+			cls: "header-name",
+		});
+		listContainer.createEl("span", {
+			text: "模型",
+			cls: "header-model",
+		});
+
+		const listBody = this.pendingListContainer.createEl("div", {
+			cls: "pending-models-list-body",
+		});
+
+		this.pendingModels.forEach((model) => {
+			const item = listBody.createEl("div", {
+				cls: "pending-model-row",
+			});
+
+			const infoContainer = item.createEl("div", {
+				cls: "pending-model-info",
+			});
+
+			// 名称行（包含 tool use 标记）
+			const nameRow = infoContainer.createEl("div", {
+				cls: "pending-model-name-row",
+			});
+			nameRow.createEl("span", {
+				text: model.name,
+				cls: "pending-model-name",
+			});
+			if (model.supportsToolUse) {
+				nameRow.createEl("span", {
+					text: "🔧",
+					cls: "pending-model-tool-badge",
+					title: "支持 tool use",
+				});
+			}
+
+			// 描述
+			if (model.description) {
+				infoContainer.createEl("div", {
+					text: model.description,
+					cls: "pending-model-description",
+				});
+			}
+
+			// 模型 ID
+			infoContainer.createEl("span", {
+				text: model.modelId,
+				cls: "pending-model-id",
+			});
+
+			const actions = item.createEl("div", {
+				cls: "pending-model-actions",
+			});
+
+			const deleteBtn = actions.createEl("button", {
+				cls: "clickable-icon pending-model-delete",
+			});
+			deleteBtn.appendChild(getIcon("x") ?? document.createTextNode("×"));
+			deleteBtn.addEventListener("click", () => {
+				this.removePendingModel(model.id);
+			});
+		});
+	}
+
+	private async saveAll(): Promise<void> {
+		if (this.pendingModels.length === 0) return;
+
+		const modelsToAdd = this.pendingModels.map((m) => ({
+			name: m.name,
+			modelId: m.modelId,
+			providerId: m.providerId,
+		}));
 
 		try {
 			await this.onSave(modelsToAdd);
@@ -406,14 +796,6 @@ class AddModelModal extends Modal {
 	}
 
 	onClose(): void {
-		// 递增请求 ID 使进行中的请求失效
-		this.loadModelsRequestId++;
-		// 清理 checkbox 监听器
-		this.checkboxListeners.forEach(({ element, listener }) => {
-			element.removeEventListener("change", listener);
-		});
-		this.checkboxListeners = [];
-
 		const { contentEl } = this;
 		contentEl.empty();
 	}

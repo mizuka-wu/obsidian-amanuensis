@@ -391,3 +391,328 @@ input:checked + .amanuensis-toggle-slider:before {
 	color: var(--text-normal);
 	word-break: break-all;
 }
+
+/* ============================================
+   Add Model Modal - New Design (参考代码字体配置页)
+   ============================================ */
+
+/* 待添加模型列表区域 */
+.pending-models-section {
+	margin-bottom: 16px;
+}
+
+.pending-models-empty {
+	padding: 24px;
+	text-align: center;
+	color: var(--text-muted);
+	font-size: 0.9em;
+}
+
+/* 列表头部 */
+.pending-models-list-header {
+	display: flex;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-size: 0.85em;
+	font-weight: 500;
+	color: var(--text-muted);
+}
+
+.pending-models-list-header .header-name {
+	flex: 1;
+}
+
+.pending-models-list-header .header-model {
+	flex: 2;
+}
+
+/* 待添加模型列表 */
+.pending-model-row {
+	display: flex;
+	align-items: flex-start;
+	padding: 10px 12px;
+	border-bottom: 1px solid var(--background-modifier-border-hover);
+}
+
+.pending-model-row:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.pending-model-row:last-child {
+	border-bottom: none;
+}
+
+.pending-model-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.pending-model-name-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 2px;
+}
+
+.pending-model-name {
+	font-size: 0.95em;
+	font-weight: 500;
+	color: var(--text-normal);
+}
+
+.pending-model-tool-badge {
+	font-size: 0.85em;
+}
+
+.pending-model-description {
+	font-size: 0.8em;
+	color: var(--text-muted);
+	margin-bottom: 2px;
+	font-style: italic;
+}
+
+.pending-model-id {
+	font-size: 0.8em;
+	color: var(--text-faint);
+	font-family: var(--font-monospace);
+}
+
+.pending-model-actions {
+	display: flex;
+	gap: 8px;
+	flex-shrink: 0;
+	margin-left: 8px;
+}
+
+.pending-model-delete {
+	color: var(--text-muted);
+	padding: 4px;
+}
+
+.pending-model-delete:hover {
+	color: var(--text-error);
+}
+
+/* 分割线 */
+.model-add-divider {
+	margin: 16px 0;
+	border: none;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+/* 底部添加区域 - 水平布局 */
+.model-add-section {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 8px 0;
+}
+
+.model-add-label {
+	font-size: 0.85em;
+	color: var(--text-muted);
+	margin-right: 6px;
+}
+
+.model-add-provider {
+	display: flex;
+	align-items: center;
+	flex: 1;
+}
+
+.model-add-provider select {
+	flex: 1;
+	padding: 6px 8px;
+	font-size: 0.9em;
+}
+
+.model-add-input-container {
+	display: flex;
+	align-items: center;
+	flex: 2;
+}
+
+.model-add-input {
+	flex: 1;
+	padding: 6px 8px;
+	font-size: 0.9em;
+	cursor: pointer;
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+}
+
+.model-add-input:hover {
+	border-color: var(--interactive-accent);
+}
+
+.model-add-button-container {
+	display: flex;
+	align-items: center;
+}
+
+/* 模型选择器弹窗 */
+.model-selector-modal .modal-content {
+	padding: 16px;
+}
+
+.model-selector-search {
+	margin-bottom: 12px;
+}
+
+.model-selector-input {
+	width: 100%;
+	padding: 8px 12px;
+	font-size: 0.9em;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-primary);
+}
+
+.model-selector-list {
+	max-height: 300px;
+	overflow-y: auto;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+}
+
+.model-selector-item {
+	display: flex;
+	flex-direction: column;
+	padding: 10px 12px;
+	cursor: pointer;
+	border-bottom: 1px solid var(--background-modifier-border-hover);
+}
+
+.model-selector-item:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.model-selector-item:last-child {
+	border-bottom: none;
+}
+
+.model-selector-name {
+	font-size: 0.95em;
+	color: var(--text-normal);
+	margin-bottom: 2px;
+}
+
+.model-selector-id {
+	font-size: 0.8em;
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
+}
+
+.model-selector-loading,
+.model-selector-empty {
+	padding: 24px;
+	text-align: center;
+	color: var(--text-muted);
+}
+
+/* 模型名称输入弹窗 */
+.model-name-input-container {
+	margin: 12px 0;
+}
+
+.model-name-input-container label {
+	display: block;
+	margin-bottom: 4px;
+	font-size: 0.85em;
+	color: var(--text-muted);
+}
+
+.model-name-input-container .checkbox-container {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 0.9em;
+	color: var(--text-normal);
+}
+
+.model-name-input-container .checkbox-container input[type="checkbox"] {
+	margin: 0;
+}
+
+.model-name-input {
+	width: 100%;
+	padding: 6px 10px;
+	font-size: 0.95em;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-primary);
+}
+
+.model-name-input:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+}
+
+/* autocomplete 下拉框 */
+.model-add-input-container {
+	position: relative;
+	flex: 2;
+}
+
+.model-autocomplete-dropdown {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	right: 0;
+	max-height: 200px;
+	overflow-y: auto;
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-top: none;
+	border-radius: 0 0 6px 6px;
+	z-index: 100;
+	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.model-autocomplete-dropdown.is-hidden {
+	display: none;
+}
+
+.model-autocomplete-item {
+	padding: 8px 12px;
+	cursor: pointer;
+	border-bottom: 1px solid var(--background-modifier-border-hover);
+}
+
+.model-autocomplete-item:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.model-autocomplete-item:last-child {
+	border-bottom: none;
+}
+
+.model-autocomplete-name {
+	display: block;
+	font-size: 0.95em;
+	color: var(--text-normal);
+}
+
+.model-autocomplete-id {
+	display: block;
+	font-size: 0.8em;
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
+}
+
+.model-autocomplete-loading,
+.model-autocomplete-empty {
+	padding: 16px;
+	text-align: center;
+	color: var(--text-muted);
+	font-size: 0.9em;
+}
+
+/* 子模态框按钮行 */
+.modal-button-row {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 16px;
+}
