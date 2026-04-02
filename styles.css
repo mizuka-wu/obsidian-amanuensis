@@ -396,10 +396,6 @@ input:checked + .amanuensis-toggle-slider:before {
    Add Model Modal - New Design (参考代码字体配置页)
    ============================================ */
 
-/* 待添加模型列表区域 */
-.pending-models-section {
-	margin-bottom: 16px;
-}
 
 .pending-models-empty {
 	padding: 24px;
@@ -501,7 +497,7 @@ input:checked + .amanuensis-toggle-slider:before {
 
 /* 分割线 */
 .model-add-divider {
-	margin: 16px 0;
+	margin: 0;
 	border: none;
 	border-top: 1px solid var(--background-modifier-border);
 }
@@ -510,8 +506,7 @@ input:checked + .amanuensis-toggle-slider:before {
 .model-add-section {
 	display: flex;
 	align-items: center;
-	gap: 12px;
-	padding: 8px 0;
+	padding: 16px 0;
 }
 
 .model-add-label {
