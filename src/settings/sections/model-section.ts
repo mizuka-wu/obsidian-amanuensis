@@ -443,12 +443,77 @@ export class ModelSection {
 			this.plugin.settings.providers,
 		);
 
+		const hasProviders = this.providerManager.getAllProviders().length > 0;
+
+		// 如果没有模型源，整个模型 section 不显示
+		if (!hasProviders) {
+			return;
+		}
+
 		new Setting(containerEl)
 			.setName(CONST.MODEL_SECTION_TITLE)
 			.setHeading();
 
 		const models = this.modelManager.getAllModels();
 		const defaultModelId = this.modelManager.getDefaultModelId();
+
+		// 顶部添加按钮带数量描述
+		new Setting(containerEl)
+			.setDesc(`你目前已经添加了 ${models.length} 个模型`)
+			.addExtraButton((btn) => {
+				btn.setIcon("circle-plus")
+					.setTooltip("添加模型")
+					.setDisabled(!hasProviders)
+					.onClick(async () => {
+						new AddModelModal(
+							this.plugin.app,
+							this.plugin,
+							async (newModels) => {
+								// 批量添加模型，带错误处理
+								let successCount = 0;
+								let failedCount = 0;
+								for (const model of newModels) {
+									try {
+										this.modelManager.addModel(
+											model.name,
+											model.modelId,
+											model.providerId,
+										);
+										successCount++;
+									} catch (error) {
+										failedCount++;
+										console.error(
+											`Failed to add model ${model.name}:`,
+											error,
+										);
+									}
+								}
+								this.plugin.settings.models =
+									this.modelManager.getAllModels();
+								await this.plugin.saveSettings();
+
+								// 显示添加结果
+								if (failedCount === 0) {
+									new Notice(
+										CONST.MODEL_BATCH_SUCCESS(successCount),
+									);
+								} else {
+									new Notice(
+										CONST.MODEL_BATCH_PARTIAL(
+											successCount,
+											failedCount,
+										),
+									);
+								}
+
+								onRefresh();
+							},
+						).open();
+					});
+				if (!hasProviders) {
+					btn.setTooltip(CONST.MODEL_ADD_TOOLTIP);
+				}
+			});
 
 		if (models.length === 0) {
 			containerEl.createEl("p", {
@@ -518,61 +583,5 @@ export class ModelSection {
 				});
 			});
 		}
-
-		const hasProviders = this.providerManager.getAllProviders().length > 0;
-		new Setting(containerEl).addButton((btn) => {
-			btn.setButtonText(CONST.MODEL_ADD_BUTTON)
-				.setCta()
-				.setDisabled(!hasProviders)
-				.onClick(async () => {
-					new AddModelModal(
-						this.plugin.app,
-						this.plugin,
-						async (newModels) => {
-							// 批量添加模型，带错误处理
-							let successCount = 0;
-							let failedCount = 0;
-							for (const model of newModels) {
-								try {
-									this.modelManager.addModel(
-										model.name,
-										model.modelId,
-										model.providerId,
-									);
-									successCount++;
-								} catch (error) {
-									failedCount++;
-									console.error(
-										`Failed to add model ${model.name}:`,
-										error,
-									);
-								}
-							}
-							this.plugin.settings.models =
-								this.modelManager.getAllModels();
-							await this.plugin.saveSettings();
-
-							// 显示添加结果
-							if (failedCount === 0) {
-								new Notice(
-									CONST.MODEL_BATCH_SUCCESS(successCount),
-								);
-							} else {
-								new Notice(
-									CONST.MODEL_BATCH_PARTIAL(
-										successCount,
-										failedCount,
-									),
-								);
-							}
-
-							onRefresh();
-						},
-					).open();
-				});
-			if (!hasProviders) {
-				btn.setTooltip(CONST.MODEL_ADD_TOOLTIP);
-			}
-		});
 	}
 }

@@ -268,6 +268,35 @@ export class ProviderSection {
 
 		const providers = this.providerManager.getAllProviders();
 
+		// 顶部添加按钮带数量描述
+		new Setting(containerEl)
+			.setDesc(`你目前已经添加了 ${providers.length} 个模型源`)
+			.addExtraButton((btn) => {
+				btn.setIcon("circle-plus")
+					.setTooltip("添加模型源")
+					.onClick(async () => {
+						new ProviderModal(
+							this.plugin.app,
+							this.plugin,
+							null,
+							async (newProvider) => {
+								const { type, name, baseUrl, apiKey } =
+									newProvider;
+								this.providerManager.createProvider(
+									type,
+									name,
+									baseUrl,
+									apiKey,
+								);
+								this.plugin.settings.providers =
+									this.providerManager.getProviders();
+								await this.plugin.saveSettings();
+								onRefresh();
+							},
+						).open();
+					});
+			});
+
 		if (providers.length === 0) {
 			containerEl.createEl("p", {
 				text: CONST.PROVIDER_EMPTY_TEXT,
@@ -322,30 +351,5 @@ export class ProviderSection {
 				});
 			});
 		}
-
-		new Setting(containerEl).addButton((btn) => {
-			btn.setButtonText(CONST.PROVIDER_ADD_BUTTON)
-				.setCta()
-				.onClick(async () => {
-					new ProviderModal(
-						this.plugin.app,
-						this.plugin,
-						null,
-						async (newProvider) => {
-							const { type, name, baseUrl, apiKey } = newProvider;
-							this.providerManager.createProvider(
-								type,
-								name,
-								baseUrl,
-								apiKey,
-							);
-							this.plugin.settings.providers =
-								this.providerManager.getProviders();
-							await this.plugin.saveSettings();
-							onRefresh();
-						},
-					).open();
-				});
-		});
 	}
 }
