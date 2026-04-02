@@ -483,31 +483,18 @@ class AddModelModal extends Modal {
 				this.addPendingModel(
 					this.selectedModel.name,
 					this.selectedModel.id,
-					"", // 从列表选择的模型，描述为空
-					false, // 默认不支持 tool use，需要用户后续编辑
+					"",
+					false,
 				);
-				// 清空选择
-				this.selectedModel = null;
-				this.modelInput.value = "";
-				this.updateAddButton();
 			} else {
-				// 手动输入的情况，弹出窗口询问名称和详细信息
-				new ModelNameInputModal(
-					this.app,
-					inputValue,
-					(name, description, supportsToolUse) => {
-						this.addPendingModel(
-							name,
-							inputValue,
-							description,
-							supportsToolUse,
-						);
-						this.selectedModel = null;
-						this.modelInput!.value = "";
-						this.updateAddButton();
-					},
-				).open();
+				// 手动输入的情况，直接用 ID 作为名称
+				this.addPendingModel(inputValue, inputValue, "", false);
 			}
+
+			// 清空选择
+			this.selectedModel = null;
+			this.modelInput.value = "";
+			this.updateAddButton();
 		});
 
 		// 底部按钮区域 - 使用 Setting 类，与 Provider 编辑保持一致
@@ -536,7 +523,19 @@ class AddModelModal extends Modal {
 	}
 
 	private async loadAndShowModels(): Promise<void> {
-		if (!this.modelDropdown || !this.currentProvider) return;
+		if (!this.modelDropdown || !this.currentProvider) {
+			console.debug(
+				"[loadAndShowModels] modelDropdown or currentProvider is null",
+			);
+			return;
+		}
+
+		console.debug(
+			"[loadAndShowModels] 开始加载模型列表，provider:",
+			this.currentProvider.name,
+			"type:",
+			this.currentProvider.type,
+		);
 
 		// 显示加载中
 		this.modelDropdown.empty();
@@ -549,7 +548,18 @@ class AddModelModal extends Modal {
 		const currentRequestId = ++this.loadModelsRequestId;
 
 		try {
-			if (!supportsBatchImport(this.currentProvider.type)) {
+			const supportsBatch = supportsBatchImport(
+				this.currentProvider.type,
+			);
+			console.debug(
+				"[loadAndShowModels] supportsBatchImport:",
+				supportsBatch,
+				"type:",
+				this.currentProvider.type,
+			);
+
+			if (!supportsBatch) {
+				console.debug("[loadAndShowModels] 此来源不支持批量导入");
 				this.modelDropdown.empty();
 				this.modelDropdown.createEl("div", {
 					cls: "model-autocomplete-empty",
@@ -558,39 +568,97 @@ class AddModelModal extends Modal {
 				return;
 			}
 
+			console.debug("[loadAndShowModels] 调用 getProviderModels...");
 			const models = await this.providerManager.getProviderModels(
 				this.currentProvider,
 			);
+			console.debug(
+				"[loadAndShowModels] getProviderModels 返回:",
+				models.length,
+				"个模型",
+				models,
+			);
 
-			if (currentRequestId !== this.loadModelsRequestId) return;
+			if (currentRequestId !== this.loadModelsRequestId) {
+				console.debug("[loadAndShowModels] 请求已过期，忽略结果");
+				return;
+			}
 
 			// 过滤已存在的模型
-			const existingIds = new Set([
-				...this.modelManager
-					.getAllModels()
-					.filter((m) => m.providerId === this.currentProvider!.id)
-					.map((m) => m.modelId),
-				...this.pendingModels
-					.filter((m) => m.providerId === this.currentProvider!.id)
-					.map((m) => m.modelId),
-			]);
+			const allExistingModels = this.modelManager.getAllModels();
+			const existingInManager = allExistingModels
+				.filter((m) => m.providerId === this.currentProvider!.id)
+				.map((m) => m.modelId);
+			const existingPending = this.pendingModels
+				.filter((m) => m.providerId === this.currentProvider!.id)
+				.map((m) => m.modelId);
 
-			this.availableModels = models.filter((m) => !existingIds.has(m.id));
+			console.debug(
+				"[loadAndShowModels] 已存在模型 - manager:",
+				existingInManager,
+				"pending:",
+				existingPending,
+			);
+
+			const existingIds = new Set([
+				...existingInManager,
+				...existingPending,
+			]);
+			console.debug(
+				"[loadAndShowModels] 过滤ID集合:",
+				Array.from(existingIds),
+			);
+
+			this.availableModels = models.filter((m) => {
+				const isExisting = existingIds.has(m.id);
+				if (isExisting) {
+					console.debug(
+						"[loadAndShowModels] 过滤掉已存在模型:",
+						m.id,
+					);
+				}
+				return !isExisting;
+			});
+
+			console.debug(
+				"[loadAndShowModels] 过滤后可用模型:",
+				this.availableModels.length,
+				"个",
+				this.availableModels,
+			);
 
 			this.renderModelDropdown();
 		} catch (error) {
 			if (currentRequestId !== this.loadModelsRequestId) return;
+			console.error("[loadAndShowModels] 加载失败:", error);
 			this.modelDropdown.empty();
 			this.modelDropdown.createEl("div", {
 				cls: "model-autocomplete-empty",
-				text: "加载失败",
+				text: `加载失败: ${error instanceof Error ? error.message : String(error)}`,
 			});
 		}
 	}
 
 	private renderModelDropdown(): void {
-		if (!this.modelDropdown) return;
+		if (!this.modelDropdown || !this.modelInput) return;
 		this.modelDropdown.empty();
+
+		// 计算并设置下拉框位置
+		const inputRect = this.modelInput.getBoundingClientRect();
+		const dropdownHeight = 200; // 最大高度
+		const spaceBelow = window.innerHeight - inputRect.bottom;
+		const spaceAbove = inputRect.top;
+
+		// 如果下方空间不够，显示在上方
+		if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+			this.modelDropdown.style.top = `${Math.max(0, inputRect.top - dropdownHeight - 8)}px`;
+		} else {
+			this.modelDropdown.style.top = `${inputRect.bottom + 8}px`;
+		}
+
+		this.modelDropdown.style.left = `${inputRect.left}px`;
+		this.modelDropdown.style.width = `${inputRect.width}px`;
+		this.modelDropdown.style.maxHeight = `${dropdownHeight}px`;
 
 		if (this.availableModels.length === 0) {
 			this.modelDropdown.createEl("div", {
@@ -614,11 +682,10 @@ class AddModelModal extends Modal {
 			});
 
 			item.addEventListener("click", () => {
-				this.selectedModel = model;
-				if (this.modelInput) {
-					this.modelInput.value = model.name;
-				}
+				// 直接添加到列表，不弹窗
+				this.addPendingModel(model.name, model.id, "", false);
 				this.hideModelDropdown();
+				this.modelInput!.value = "";
 				this.updateAddButton();
 			});
 		});

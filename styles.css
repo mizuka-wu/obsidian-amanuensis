@@ -651,23 +651,18 @@ input:checked + .amanuensis-toggle-slider:before {
 
 /* autocomplete 下拉框 */
 .model-add-input-container {
-	position: relative;
 	flex: 2;
 }
 
 .model-autocomplete-dropdown {
-	position: absolute;
-	top: 100%;
-	left: 0;
-	right: 0;
+	position: fixed;
 	max-height: 200px;
 	overflow-y: auto;
 	background-color: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
-	border-top: none;
-	border-radius: 0 0 6px 6px;
-	z-index: 100;
-	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+	border-radius: 6px;
+	z-index: 1000;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .model-autocomplete-dropdown.is-hidden {

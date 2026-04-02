@@ -16,12 +16,13 @@ export const config: ProviderConfig = {
 };
 
 interface LMStudioModel {
-	id: string;
-	object: string;
+	key: string;
+	display_name?: string;
+	id?: string;
 }
 
 interface LMStudioResponse {
-	data?: LMStudioModel[];
+	models?: LMStudioModel[];
 }
 
 export async function fetchModels(
@@ -37,12 +38,14 @@ export async function fetchModels(
 		});
 
 		const data = response.json as LMStudioResponse;
-		return (
-			data.data?.map((m) => ({
-				id: m.id,
-				name: m.id,
-			})) || []
-		);
+
+		// LM Studio 返回 { models: [...] } 格式
+		const models = data.models || [];
+
+		return models.map((m: LMStudioModel) => ({
+			id: m.key || m.id || "",
+			name: m.display_name || m.key || m.id || "",
+		}));
 	} catch (error) {
 		console.error("Failed to fetch LM Studio models:", error);
 		throw new Error(
