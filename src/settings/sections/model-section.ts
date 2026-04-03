@@ -227,7 +227,7 @@ class AddModelModal extends Modal {
 			this.selectedModel = null;
 			if (this.modelInput) {
 				this.modelInput.value = "";
-				this.modelInput.placeholder = "点击选择或输入 id";
+				this.modelInput.placeholder = "点击选择或输入 ID";
 			}
 			this.updateAddButton();
 		});
@@ -328,7 +328,9 @@ class AddModelModal extends Modal {
 		const currentRequestId = ++this.loadModelsRequestId;
 
 		try {
-			const supportsBatch = supportsBatchImport(this.currentProvider.type);
+			const supportsBatch = supportsBatchImport(
+				this.currentProvider.type,
+			);
 
 			if (!supportsBatch) {
 				this.modelDropdown.empty();
@@ -565,7 +567,9 @@ class AddModelModal extends Modal {
 			const editBtn = actions.createEl("button", {
 				cls: "clickable-icon pending-model-edit",
 			});
-			editBtn.appendChild(getIcon("pencil") ?? document.createTextNode("✎"));
+			editBtn.appendChild(
+				getIcon("pencil") ?? document.createTextNode("✎"),
+			);
 			editBtn.addEventListener("click", () => {
 				new ModelConfigModal(
 					this.app,
@@ -750,58 +754,59 @@ export class ModelSection {
 					.setName(model.name)
 					.setDesc(desc);
 
-				setting.addButton((btn) => {
-					btn.setIcon("pencil").setTooltip("编辑模型").onClick(() => {
-						new ModelConfigModal(
-							this.plugin.app,
-							model.modelId,
-							{
-								name: model.name,
-								supportsVision: model.supportsVision || false,
-								supportsToolUse: model.supportsToolUse || false,
-							},
-							async (config) => {
-								this.modelManager.updateModel(model.id, {
-									name: config.name,
-									supportsVision: config.supportsVision,
-									supportsToolUse: config.supportsToolUse,
-								});
-								this.plugin.settings.models =
-									this.modelManager.getAllModels();
-								await this.plugin.saveSettings();
-								onRefresh();
-							},
-						).open();
-					});
-				});
-
-				setting.addToggle((toggle) => {
-					toggle.setValue(model.enabled).onChange(async (value) => {
-						this.modelManager.toggleModelEnabled(model.id);
-						this.plugin.settings.models =
-							this.modelManager.getAllModels();
-						await this.plugin.saveSettings();
-						onRefresh();
-					});
+				setting.addExtraButton((btn) => {
+					btn.setIcon("settings")
+						.setTooltip("配置模型")
+						.onClick(() => {
+							new ModelConfigModal(
+								this.plugin.app,
+								model.modelId,
+								{
+									name: model.name,
+									supportsVision:
+										model.supportsVision || false,
+									supportsToolUse:
+										model.supportsToolUse || false,
+								},
+								(config) => {
+									void (async () => {
+										this.modelManager.updateModel(
+											model.id,
+											{
+												name: config.name,
+												supportsVision:
+													config.supportsVision,
+												supportsToolUse:
+													config.supportsToolUse,
+											},
+										);
+										this.plugin.settings.models =
+											this.modelManager.getAllModels();
+										await this.plugin.saveSettings();
+										onRefresh();
+									})();
+								},
+							).open();
+						});
 				});
 
 				if (model.enabled && model.id !== defaultModelId) {
-					setting.addButton((btn) => {
-						btn.setButtonText(
-							CONST.MODEL_SET_DEFAULT_BUTTON,
-						).onClick(async () => {
-							this.modelManager.setDefaultModel(model.id);
-							this.plugin.settings.defaultModelId =
-								this.modelManager.getDefaultModelId();
-							await this.plugin.saveSettings();
-							onRefresh();
-						});
+					setting.addExtraButton((btn) => {
+						btn.setIcon("star")
+							.setTooltip("设为默认")
+							.onClick(async () => {
+								this.modelManager.setDefaultModel(model.id);
+								this.plugin.settings.defaultModelId =
+									this.modelManager.getDefaultModelId();
+								await this.plugin.saveSettings();
+								onRefresh();
+							});
 					});
 				}
 
-				setting.addButton((btn) => {
-					btn.setButtonText(CONST.MODEL_DELETE_BUTTON)
-						.setWarning()
+				setting.addExtraButton((btn) => {
+					btn.setIcon("trash-2")
+						.setTooltip("删除")
 						.onClick(async () => {
 							new ConfirmModal(
 								this.plugin.app,
@@ -817,6 +822,16 @@ export class ModelSection {
 								},
 							).open();
 						});
+				});
+
+				setting.addToggle((toggle) => {
+					toggle.setValue(model.enabled).onChange(async (value) => {
+						this.modelManager.toggleModelEnabled(model.id);
+						this.plugin.settings.models =
+							this.modelManager.getAllModels();
+						await this.plugin.saveSettings();
+						onRefresh();
+					});
 				});
 			});
 		}
