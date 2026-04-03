@@ -21,6 +21,8 @@ export interface ModelEntry {
 	modelId: string;
 	providerId: string;
 	enabled: boolean;
+	supportsVision?: boolean;
+	supportsToolUse?: boolean;
 }
 
 export interface AmanuensisPluginSettings {

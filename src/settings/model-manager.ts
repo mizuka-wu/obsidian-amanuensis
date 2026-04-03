@@ -10,7 +10,13 @@ export class ModelManager {
 		this.defaultModelId = defaultModelId;
 	}
 
-	addModel(name: string, modelId: string, providerId: string): ModelEntry {
+	addModel(
+		name: string,
+		modelId: string,
+		providerId: string,
+		supportsVision?: boolean,
+		supportsToolUse?: boolean,
+	): ModelEntry {
 		if (!name || !modelId || !providerId) {
 			throw new Error("Model name, modelId and providerId are required");
 		}
@@ -22,6 +28,8 @@ export class ModelManager {
 			modelId,
 			providerId,
 			enabled: true,
+			supportsVision,
+			supportsToolUse,
 		};
 
 		this.models.push(model);

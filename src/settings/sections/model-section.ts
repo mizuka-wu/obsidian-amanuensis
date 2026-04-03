@@ -16,38 +16,40 @@ import { ConfirmModal } from "../../settings";
 
 // 待添加的模型项
 interface PendingModel {
-	id: string; // 临时ID，用于列表管理
+	id: string;
 	name: string;
 	modelId: string;
 	providerId: string;
 	providerName: string;
-	description: string; // 模型功能描述
-	supportsToolUse: boolean; // 是否支持 tool use
+	supportsVision: boolean;
+	supportsToolUse: boolean;
 }
 
-// 手动输入模型时询问名称的弹窗
-class ModelNameInputModal extends Modal {
+// 统一的模型配置弹窗
+interface ModelConfig {
+	name: string;
+	supportsVision: boolean;
+	supportsToolUse: boolean;
+}
+
+class ModelConfigModal extends Modal {
+	initialConfig: ModelConfig;
+	onConfirm: (config: ModelConfig) => void;
 	modelId: string;
-	onConfirm: (
-		name: string,
-		description: string,
-		supportsToolUse: boolean,
-	) => void;
+
 	nameInput: HTMLInputElement | null = null;
-	descriptionInput: HTMLInputElement | null = null;
+	supportsVisionInput: HTMLInputElement | null = null;
 	supportsToolUseInput: HTMLInputElement | null = null;
 
 	constructor(
 		app: App,
 		modelId: string,
-		onConfirm: (
-			name: string,
-			description: string,
-			supportsToolUse: boolean,
-		) => void,
+		initialConfig: ModelConfig,
+		onConfirm: (config: ModelConfig) => void,
 	) {
 		super(app);
 		this.modelId = modelId;
+		this.initialConfig = initialConfig;
 		this.onConfirm = onConfirm;
 	}
 
@@ -55,249 +57,60 @@ class ModelNameInputModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 
-		this.titleEl.setText("输入模型名称");
+		this.titleEl.setText("配置模型");
 
-		// 显示模型 ID
 		contentEl.createEl("p", {
 			text: `模型 ID: ${this.modelId}`,
 			cls: "setting-item-description",
 		});
 
-		// 名称输入
-		const nameContainer = contentEl.createEl("div", {
-			cls: "model-name-input-container",
-		});
-		this.nameInput = nameContainer.createEl("input", {
-			type: "text",
-			cls: "model-name-input",
-			placeholder: "输入模型显示名称",
+		new Setting(contentEl).setName("显示名称").addText((text) => {
+			this.nameInput = text.inputEl;
+			text.setValue(this.initialConfig.name);
 		});
 
-		// 功能描述输入
-		const descContainer = contentEl.createEl("div", {
-			cls: "model-name-input-container",
-		});
-		descContainer.createEl("label", {
-			text: "功能描述（可选）:",
-			cls: "setting-item-description",
-		});
-		this.descriptionInput = descContainer.createEl("input", {
-			type: "text",
-			cls: "model-name-input",
-			placeholder: "描述此模型的功能，如：适合代码补全、长文本生成等",
-		});
+		new Setting(contentEl)
+			.setName("支持 vision")
+			.setDesc("此模型是否支持图像识别功能")
+			.addToggle((toggle) => {
+				this.supportsVisionInput = toggle.toggleEl as HTMLInputElement;
+				toggle.setValue(this.initialConfig.supportsVision);
+			});
 
-		// tool use 支持
-		const toolUseContainer = contentEl.createEl("div", {
-			cls: "model-name-input-container",
-		});
-		const toolUseLabel = toolUseContainer.createEl("label", {
-			cls: "checkbox-container",
-		});
-		this.supportsToolUseInput = toolUseLabel.createEl("input", {
-			type: "checkbox",
-		});
-		toolUseLabel.appendText(" 支持 tool use（函数调用）");
+		new Setting(contentEl)
+			.setName("支持 tool use")
+			.setDesc("此模型是否支持函数调用功能")
+			.addToggle((toggle) => {
+				this.supportsToolUseInput = toggle.toggleEl as HTMLInputElement;
+				toggle.setValue(this.initialConfig.supportsToolUse);
+			});
 
-		// 默认填入 modelId
-		this.nameInput.value = this.modelId;
-		this.nameInput.focus();
-
-		// 按钮行
-		const buttonRow = contentEl.createEl("div", {
-			cls: "modal-button-row",
-		});
-
-		const cancelBtn = buttonRow.createEl("button", {
-			text: "取消",
-		});
-		cancelBtn.addEventListener("click", () => {
-			this.close();
-		});
-
-		const confirmBtn = buttonRow.createEl("button", {
-			cls: "mod-cta",
-			text: "确定",
-		});
-		confirmBtn.addEventListener("click", () => {
-			const name = this.nameInput?.value.trim();
-			const description = this.descriptionInput?.value.trim() || "";
-			const supportsToolUse = this.supportsToolUseInput?.checked || false;
-			if (name) {
-				this.onConfirm(name, description, supportsToolUse);
-				this.close();
-			}
-		});
-	}
-
-	onClose(): void {
-		const { contentEl } = this;
-		contentEl.empty();
-	}
-}
-
-// 模型选择下拉/弹窗组件
-class ModelSelectorModal extends Modal {
-	plugin: AmanuensisPlugin;
-	onSelect: (model: FetchedModel) => void;
-	provider: ProviderProfile;
-	providerManager: ProviderManager;
-	modelManager: ModelManager;
-	existingModelIds: Set<string>;
-
-	availableModels: FetchedModel[] = [];
-	modelsContainer: HTMLElement | null = null;
-	searchInput: HTMLInputElement | null = null;
-
-	private loadModelsRequestId: number = 0;
-
-	constructor(
-		app: App,
-		plugin: AmanuensisPlugin,
-		provider: ProviderProfile,
-		existingModelIds: Set<string>,
-		onSelect: (model: FetchedModel) => void,
-	) {
-		super(app);
-		this.plugin = plugin;
-		this.provider = provider;
-		this.existingModelIds = existingModelIds;
-		this.onSelect = onSelect;
-		this.providerManager = new ProviderManager(plugin.settings.providers);
-		this.modelManager = new ModelManager(
-			plugin.settings.models,
-			plugin.settings.defaultModelId,
-		);
-	}
-
-	onOpen(): void {
-		const { contentEl } = this;
-		contentEl.empty();
-		contentEl.addClass("model-selector-modal");
-
-		this.titleEl.setText(`选择模型 - ${this.provider.name}`);
-
-		// 搜索框
-		const searchContainer = contentEl.createEl("div", {
-			cls: "model-selector-search",
-		});
-		this.searchInput = searchContainer.createEl("input", {
-			type: "text",
-			cls: "model-selector-input",
-			placeholder: "搜索模型...",
-		});
-
-		// 模型列表容器
-		this.modelsContainer = contentEl.createEl("div", {
-			cls: "model-selector-list",
-		});
-
-		// 加载模型
-		void this.loadModels();
-
-		// 搜索功能
-		this.searchInput.addEventListener("input", () => {
-			this.filterModels();
-		});
-	}
-
-	private async loadModels(): Promise<void> {
-		if (!this.modelsContainer) return;
-
-		const currentRequestId = ++this.loadModelsRequestId;
-
-		// 显示加载中
-		this.modelsContainer.empty();
-		const loadingEl = this.modelsContainer.createEl("div", {
-			cls: "model-selector-loading",
-			text: "加载中...",
-		});
-
-		try {
-			if (!supportsBatchImport(this.provider.type)) {
-				loadingEl.setText("此来源不支持获取模型列表");
-				return;
-			}
-
-			const models = await this.providerManager.getProviderModels(
-				this.provider,
-			);
-
-			if (currentRequestId !== this.loadModelsRequestId) return;
-
-			// 过滤已存在的模型
-			this.availableModels = models.filter(
-				(m) => !this.existingModelIds.has(m.id),
-			);
-
-			loadingEl.remove();
-
-			if (this.availableModels.length === 0) {
-				this.modelsContainer.createEl("div", {
-					cls: "model-selector-empty",
-					text: "没有可用模型",
+		new Setting(contentEl)
+			.addButton((btn) => {
+				btn.setButtonText("取消").onClick(() => {
+					this.close();
 				});
-				return;
-			}
-
-			this.renderModelList();
-		} catch (error) {
-			if (currentRequestId !== this.loadModelsRequestId) return;
-			loadingEl.setText(
-				`加载失败: ${error instanceof Error ? error.message : "未知错误"}`,
-			);
-		}
-	}
-
-	private renderModelList(): void {
-		if (!this.modelsContainer) return;
-		this.modelsContainer.empty();
-
-		this.availableModels.forEach((model) => {
-			const item = this.modelsContainer!.createEl("div", {
-				cls: "model-selector-item",
+			})
+			.addButton((btn) => {
+				btn.setButtonText("保存")
+					.setCta()
+					.onClick(() => {
+						const config: ModelConfig = {
+							name:
+								this.nameInput?.value.trim() ||
+								this.initialConfig.name,
+							supportsVision:
+								this.supportsVisionInput?.checked || false,
+							supportsToolUse:
+								this.supportsToolUseInput?.checked || false,
+						};
+						this.onConfirm(config);
+						this.close();
+					});
 			});
-
-			item.createEl("span", {
-				text: model.name,
-				cls: "model-selector-name",
-			});
-
-			item.createEl("span", {
-				text: model.id,
-				cls: "model-selector-id",
-			});
-
-			item.addEventListener("click", () => {
-				this.onSelect(model);
-				this.close();
-			});
-		});
-	}
-
-	private filterModels(): void {
-		if (!this.searchInput || !this.modelsContainer) return;
-
-		const query = this.searchInput.value.toLowerCase();
-		const items = this.modelsContainer.querySelectorAll(
-			".model-selector-item",
-		);
-
-		items.forEach((item) => {
-			const nameEl = item.querySelector(".model-selector-name");
-			const idEl = item.querySelector(".model-selector-id");
-			const text =
-				(nameEl?.textContent || "") + (idEl?.textContent || "");
-			(item as HTMLElement).style.display = text
-				.toLowerCase()
-				.includes(query)
-				? ""
-				: "none";
-		});
 	}
 
 	onClose(): void {
-		this.loadModelsRequestId++;
 		const { contentEl } = this;
 		contentEl.empty();
 	}
@@ -306,27 +119,28 @@ class ModelSelectorModal extends Modal {
 class AddModelModal extends Modal {
 	plugin: AmanuensisPlugin;
 	onSave: (
-		models: { name: string; modelId: string; providerId: string }[],
+		models: {
+			name: string;
+			modelId: string;
+			providerId: string;
+			supportsVision: boolean;
+			supportsToolUse: boolean;
+		}[],
 	) => Promise<void>;
 
 	providerManager: ProviderManager;
 	modelManager: ModelManager;
 
-	// 待添加模型列表
 	pendingModels: PendingModel[] = [];
 	pendingListContainer: HTMLElement | null = null;
-
-	// 当前选择的provider和模型
 	currentProvider: ProviderProfile | null = null;
 	selectedModel: FetchedModel | null = null;
 
-	// 输入框和下拉列表
 	modelInputContainer: HTMLElement | null = null;
 	modelInput: HTMLInputElement | null = null;
 	modelDropdown: HTMLElement | null = null;
 	addButton: HTMLButtonElement | null = null;
 
-	// 可用的模型列表
 	availableModels: FetchedModel[] = [];
 	private loadModelsRequestId: number = 0;
 
@@ -336,7 +150,13 @@ class AddModelModal extends Modal {
 		app: App,
 		plugin: AmanuensisPlugin,
 		onSave: (
-			models: { name: string; modelId: string; providerId: string }[],
+			models: {
+				name: string;
+				modelId: string;
+				providerId: string;
+				supportsVision: boolean;
+				supportsToolUse: boolean;
+			}[],
 		) => void | Promise<void>,
 	) {
 		super(app);
@@ -371,23 +191,17 @@ class AddModelModal extends Modal {
 			return;
 		}
 
-		// 待添加模型列表区域（顶部）
 		this.pendingListContainer = contentEl.createEl("div", {
 			cls: "pending-models-section",
 		});
-
-		// 初始渲染空列表提示
 		this.renderPendingList();
 
-		// 分割线
 		contentEl.createEl("hr", { cls: "model-add-divider" });
 
-		// 底部添加区域 - 水平布局
 		const addSection = contentEl.createEl("div", {
 			cls: "model-add-section",
 		});
 
-		// Provider 选择器
 		const providerContainer = addSection.createEl("div", {
 			cls: "model-add-provider",
 		});
@@ -402,7 +216,6 @@ class AddModelModal extends Modal {
 			});
 		});
 
-		// 选择第一个 provider
 		if (providers.length > 0) {
 			this.currentProvider = providers[0] ?? null;
 		}
@@ -411,7 +224,6 @@ class AddModelModal extends Modal {
 			const providerId = providerSelect.value;
 			const provider = this.providerManager.getProviderById(providerId);
 			this.currentProvider = provider ?? null;
-			// 切换 provider 时清空当前选择的模型
 			this.selectedModel = null;
 			if (this.modelInput) {
 				this.modelInput.value = "";
@@ -420,24 +232,20 @@ class AddModelModal extends Modal {
 			this.updateAddButton();
 		});
 
-		// 模型选择输入框（带 autocomplete 下拉）
 		this.modelInputContainer = addSection.createEl("div", {
 			cls: "model-add-input-container",
 		});
 
-		// 输入框
 		this.modelInput = this.modelInputContainer.createEl("input", {
 			type: "text",
 			cls: "model-add-input",
 			placeholder: "点击选择或输入 id",
 		});
 
-		// 下拉列表容器（初始隐藏）
 		this.modelDropdown = this.modelInputContainer.createEl("div", {
 			cls: "model-autocomplete-dropdown is-hidden",
 		});
 
-		// 监听输入框焦点
 		this.modelInput.addEventListener("focus", () => {
 			if (!this.currentProvider) {
 				new Notice("请先选择 provider");
@@ -447,13 +255,11 @@ class AddModelModal extends Modal {
 			void this.loadAndShowModels();
 		});
 
-		// 监听输入变化（过滤）
 		this.modelInput.addEventListener("input", () => {
 			this.updateAddButton();
 			this.filterModelDropdown();
 		});
 
-		// 点击外部关闭下拉
 		document.addEventListener("click", (e) => {
 			if (
 				this.modelInputContainer &&
@@ -463,7 +269,6 @@ class AddModelModal extends Modal {
 			}
 		});
 
-		// 添加按钮
 		const addBtnContainer = addSection.createEl("div", {
 			cls: "model-add-button-container",
 		});
@@ -478,26 +283,13 @@ class AddModelModal extends Modal {
 			const inputValue = this.modelInput.value.trim();
 			if (!inputValue) return;
 
-			// 如果是从选择器选择的模型
-			if (this.selectedModel && this.selectedModel.id === inputValue) {
-				this.addPendingModel(
-					this.selectedModel.name,
-					this.selectedModel.id,
-					"",
-					false,
-				);
-			} else {
-				// 手动输入的情况，直接用 ID 作为名称
-				this.addPendingModel(inputValue, inputValue, "", false);
-			}
+			this.addPendingModel(inputValue, inputValue, false, false);
 
-			// 清空选择
 			this.selectedModel = null;
 			this.modelInput.value = "";
 			this.updateAddButton();
 		});
 
-		// 底部按钮区域 - 使用 Setting 类，与 Provider 编辑保持一致
 		new Setting(contentEl)
 			.addButton((btn) => {
 				btn.setButtonText(CONST.MODEL_MODAL_CANCEL).onClick(() => {
@@ -517,27 +309,15 @@ class AddModelModal extends Modal {
 
 	private updateAddButton(): void {
 		if (this.addButton && this.modelInput) {
-			// 有输入内容就启用添加按钮
 			this.addButton.disabled = !this.modelInput.value.trim();
 		}
 	}
 
 	private async loadAndShowModels(): Promise<void> {
 		if (!this.modelDropdown || !this.currentProvider) {
-			console.debug(
-				"[loadAndShowModels] modelDropdown or currentProvider is null",
-			);
 			return;
 		}
 
-		console.debug(
-			"[loadAndShowModels] 开始加载模型列表，provider:",
-			this.currentProvider.name,
-			"type:",
-			this.currentProvider.type,
-		);
-
-		// 显示加载中
 		this.modelDropdown.empty();
 		this.modelDropdown.removeClass("is-hidden");
 		this.modelDropdown.createEl("div", {
@@ -548,18 +328,9 @@ class AddModelModal extends Modal {
 		const currentRequestId = ++this.loadModelsRequestId;
 
 		try {
-			const supportsBatch = supportsBatchImport(
-				this.currentProvider.type,
-			);
-			console.debug(
-				"[loadAndShowModels] supportsBatchImport:",
-				supportsBatch,
-				"type:",
-				this.currentProvider.type,
-			);
+			const supportsBatch = supportsBatchImport(this.currentProvider.type);
 
 			if (!supportsBatch) {
-				console.debug("[loadAndShowModels] 此来源不支持批量导入");
 				this.modelDropdown.empty();
 				this.modelDropdown.createEl("div", {
 					cls: "model-autocomplete-empty",
@@ -568,23 +339,12 @@ class AddModelModal extends Modal {
 				return;
 			}
 
-			console.debug("[loadAndShowModels] 调用 getProviderModels...");
 			const models = await this.providerManager.getProviderModels(
 				this.currentProvider,
 			);
-			console.debug(
-				"[loadAndShowModels] getProviderModels 返回:",
-				models.length,
-				"个模型",
-				models,
-			);
 
-			if (currentRequestId !== this.loadModelsRequestId) {
-				console.debug("[loadAndShowModels] 请求已过期，忽略结果");
-				return;
-			}
+			if (currentRequestId !== this.loadModelsRequestId) return;
 
-			// 过滤已存在的模型
 			const allExistingModels = this.modelManager.getAllModels();
 			const existingInManager = allExistingModels
 				.filter((m) => m.providerId === this.currentProvider!.id)
@@ -593,44 +353,15 @@ class AddModelModal extends Modal {
 				.filter((m) => m.providerId === this.currentProvider!.id)
 				.map((m) => m.modelId);
 
-			console.debug(
-				"[loadAndShowModels] 已存在模型 - manager:",
-				existingInManager,
-				"pending:",
-				existingPending,
-			);
-
 			const existingIds = new Set([
 				...existingInManager,
 				...existingPending,
 			]);
-			console.debug(
-				"[loadAndShowModels] 过滤ID集合:",
-				Array.from(existingIds),
-			);
 
-			this.availableModels = models.filter((m) => {
-				const isExisting = existingIds.has(m.id);
-				if (isExisting) {
-					console.debug(
-						"[loadAndShowModels] 过滤掉已存在模型:",
-						m.id,
-					);
-				}
-				return !isExisting;
-			});
-
-			console.debug(
-				"[loadAndShowModels] 过滤后可用模型:",
-				this.availableModels.length,
-				"个",
-				this.availableModels,
-			);
-
+			this.availableModels = models.filter((m) => !existingIds.has(m.id));
 			this.renderModelDropdown();
 		} catch (error) {
 			if (currentRequestId !== this.loadModelsRequestId) return;
-			console.error("[loadAndShowModels] 加载失败:", error);
 			this.modelDropdown.empty();
 			this.modelDropdown.createEl("div", {
 				cls: "model-autocomplete-empty",
@@ -643,13 +374,11 @@ class AddModelModal extends Modal {
 		if (!this.modelDropdown || !this.modelInput) return;
 		this.modelDropdown.empty();
 
-		// 计算并设置下拉框位置
 		const inputRect = this.modelInput.getBoundingClientRect();
-		const dropdownHeight = 200; // 最大高度
+		const dropdownHeight = 200;
 		const spaceBelow = window.innerHeight - inputRect.bottom;
 		const spaceAbove = inputRect.top;
 
-		// 如果下方空间不够，显示在上方
 		if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
 			this.modelDropdown.style.top = `${Math.max(0, inputRect.top - dropdownHeight - 8)}px`;
 		} else {
@@ -682,8 +411,7 @@ class AddModelModal extends Modal {
 			});
 
 			item.addEventListener("click", () => {
-				// 直接添加到列表，不弹窗
-				this.addPendingModel(model.name, model.id, "", false);
+				this.addPendingModel(model.name, model.id, false, false);
 				this.hideModelDropdown();
 				this.modelInput!.value = "";
 				this.updateAddButton();
@@ -725,12 +453,11 @@ class AddModelModal extends Modal {
 	private addPendingModel(
 		name: string,
 		modelId: string,
-		description: string = "",
+		supportsVision: boolean = false,
 		supportsToolUse: boolean = false,
 	): void {
 		if (!this.currentProvider) return;
 
-		// 检查是否已存在
 		const exists = this.pendingModels.some(
 			(m) =>
 				m.modelId === modelId &&
@@ -747,7 +474,7 @@ class AddModelModal extends Modal {
 			modelId,
 			providerId: this.currentProvider.id,
 			providerName: this.currentProvider.name,
-			description,
+			supportsVision,
 			supportsToolUse,
 		};
 
@@ -800,7 +527,6 @@ class AddModelModal extends Modal {
 				cls: "pending-model-info",
 			});
 
-			// 名称行（包含 tool use 标记）
 			const nameRow = infoContainer.createEl("div", {
 				cls: "pending-model-name-row",
 			});
@@ -808,6 +534,13 @@ class AddModelModal extends Modal {
 				text: model.name,
 				cls: "pending-model-name",
 			});
+			if (model.supportsVision) {
+				nameRow.createEl("span", {
+					text: "👁️",
+					cls: "pending-model-vision-badge",
+					title: "支持 vision",
+				});
+			}
 			if (model.supportsToolUse) {
 				nameRow.createEl("span", {
 					text: "🔧",
@@ -816,15 +549,6 @@ class AddModelModal extends Modal {
 				});
 			}
 
-			// 描述
-			if (model.description) {
-				infoContainer.createEl("div", {
-					text: model.description,
-					cls: "pending-model-description",
-				});
-			}
-
-			// 模型 ID
 			infoContainer.createEl("span", {
 				text: model.modelId,
 				cls: "pending-model-id",
@@ -836,6 +560,36 @@ class AddModelModal extends Modal {
 
 			const actions = actionsContainer.createEl("div", {
 				cls: "pending-model-actions",
+			});
+
+			const editBtn = actions.createEl("button", {
+				cls: "clickable-icon pending-model-edit",
+			});
+			editBtn.appendChild(getIcon("pencil") ?? document.createTextNode("✎"));
+			editBtn.addEventListener("click", () => {
+				new ModelConfigModal(
+					this.app,
+					model.modelId,
+					{
+						name: model.name,
+						supportsVision: model.supportsVision,
+						supportsToolUse: model.supportsToolUse,
+					},
+					(config) => {
+						const idx = this.pendingModels.findIndex(
+							(m) => m.id === model.id,
+						);
+						if (idx !== -1) {
+							this.pendingModels[idx] = {
+								...model,
+								name: config.name,
+								supportsVision: config.supportsVision,
+								supportsToolUse: config.supportsToolUse,
+							};
+							this.renderPendingList();
+						}
+					},
+				).open();
 			});
 
 			const deleteBtn = actions.createEl("button", {
@@ -855,6 +609,8 @@ class AddModelModal extends Modal {
 			name: m.name,
 			modelId: m.modelId,
 			providerId: m.providerId,
+			supportsVision: m.supportsVision,
+			supportsToolUse: m.supportsToolUse,
 		}));
 
 		try {
@@ -887,7 +643,6 @@ export class ModelSection {
 	}
 
 	display(containerEl: HTMLElement, onRefresh: () => void): void {
-		// Update managers with latest settings
 		this.modelManager = new ModelManager(
 			this.plugin.settings.models,
 			this.plugin.settings.defaultModelId,
@@ -898,7 +653,6 @@ export class ModelSection {
 
 		const hasProviders = this.providerManager.getAllProviders().length > 0;
 
-		// 如果没有模型源，整个模型 section 不显示
 		if (!hasProviders) {
 			return;
 		}
@@ -910,7 +664,6 @@ export class ModelSection {
 		const models = this.modelManager.getAllModels();
 		const defaultModelId = this.modelManager.getDefaultModelId();
 
-		// 顶部添加按钮带数量描述
 		new Setting(containerEl)
 			.setDesc(`你目前已经添加了 ${models.length} 个模型`)
 			.addExtraButton((btn) => {
@@ -922,7 +675,6 @@ export class ModelSection {
 							this.plugin.app,
 							this.plugin,
 							async (newModels) => {
-								// 批量添加模型，带错误处理
 								let successCount = 0;
 								let failedCount = 0;
 								for (const model of newModels) {
@@ -931,6 +683,8 @@ export class ModelSection {
 											model.name,
 											model.modelId,
 											model.providerId,
+											model.supportsVision,
+											model.supportsToolUse,
 										);
 										successCount++;
 									} catch (error) {
@@ -945,7 +699,6 @@ export class ModelSection {
 									this.modelManager.getAllModels();
 								await this.plugin.saveSettings();
 
-								// 显示添加结果
 								if (failedCount === 0) {
 									new Notice(
 										CONST.MODEL_BATCH_SUCCESS(successCount),
@@ -983,6 +736,12 @@ export class ModelSection {
 					: CONST.MODEL_PROVIDER_UNKNOWN;
 
 				let desc = `${CONST.MODEL_PROVIDER_PREFIX}${providerName}${CONST.MODEL_ID_PREFIX}${model.modelId}`;
+				if (model.supportsVision) {
+					desc += " [👁️]";
+				}
+				if (model.supportsToolUse) {
+					desc += " [🔧]";
+				}
 				if (model.id === defaultModelId) {
 					desc += CONST.MODEL_DEFAULT_BADGE;
 				}
@@ -990,6 +749,31 @@ export class ModelSection {
 				const setting = new Setting(containerEl)
 					.setName(model.name)
 					.setDesc(desc);
+
+				setting.addButton((btn) => {
+					btn.setIcon("pencil").setTooltip("编辑模型").onClick(() => {
+						new ModelConfigModal(
+							this.plugin.app,
+							model.modelId,
+							{
+								name: model.name,
+								supportsVision: model.supportsVision || false,
+								supportsToolUse: model.supportsToolUse || false,
+							},
+							async (config) => {
+								this.modelManager.updateModel(model.id, {
+									name: config.name,
+									supportsVision: config.supportsVision,
+									supportsToolUse: config.supportsToolUse,
+								});
+								this.plugin.settings.models =
+									this.modelManager.getAllModels();
+								await this.plugin.saveSettings();
+								onRefresh();
+							},
+						).open();
+					});
+				});
 
 				setting.addToggle((toggle) => {
 					toggle.setValue(model.enabled).onChange(async (value) => {
