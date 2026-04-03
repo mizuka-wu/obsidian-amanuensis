@@ -212,7 +212,7 @@ class AddModelModal extends Modal {
 		providers.forEach((provider) => {
 			providerSelect.createEl("option", {
 				value: provider.id,
-				text: `${provider.name} (${provider.type})`,
+				text: provider.name,
 			});
 		});
 

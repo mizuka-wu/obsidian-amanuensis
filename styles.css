@@ -507,6 +507,7 @@ input:checked + .amanuensis-toggle-slider:before {
 	display: flex;
 	align-items: center;
 	padding: 16px 0;
+	gap: 8px;
 }
 
 .model-add-label {
@@ -550,6 +551,25 @@ input:checked + .amanuensis-toggle-slider:before {
 .model-add-button-container {
 	display: flex;
 	align-items: center;
+}
+
+.model-add-button-container button {
+	padding: 6px 12px;
+	font-size: 0.9em;
+	border-radius: 4px;
+	cursor: pointer;
+	border: none;
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.model-add-button-container button:hover {
+	opacity: 0.9;
+}
+
+.model-add-button-container button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
 }
 
 /* 模型选择器弹窗 */
