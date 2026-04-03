@@ -308,9 +308,10 @@ export class ProviderSection {
 					.setName(provider.name)
 					.setDesc(`类型: ${provider.type}`);
 
-				setting.addButton((btn) => {
-					btn.setButtonText(CONST.PROVIDER_MANAGE_BUTTON).onClick(
-						async () => {
+				setting.addExtraButton((btn) => {
+					btn.setIcon("settings")
+						.setTooltip("配置")
+						.onClick(async () => {
 							new ProviderModal(
 								this.plugin.app,
 								this.plugin,
@@ -326,13 +327,12 @@ export class ProviderSection {
 									onRefresh();
 								},
 							).open();
-						},
-					);
+						});
 				});
 
-				setting.addButton((btn) => {
-					btn.setButtonText(CONST.PROVIDER_DELETE_BUTTON)
-						.setWarning()
+				setting.addExtraButton((btn) => {
+					btn.setIcon("trash-2")
+						.setTooltip("删除")
 						.onClick(async () => {
 							new ConfirmModal(
 								this.plugin.app,
