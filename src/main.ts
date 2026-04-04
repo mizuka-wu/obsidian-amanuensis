@@ -6,6 +6,8 @@ import {
 	AmanuensisSettingTab,
 } from "./settings";
 import { validatePort, getPortErrorMessage } from "./utils/port-validator";
+import { AIView, AI_VIEW_TYPE } from "./ui/ai-view";
+import { registerAIRibbonIcon } from "./ui/ai-ribbon-icon";
 
 // Remember to rename these classes and interfaces!
 
@@ -18,6 +20,12 @@ export default class AmanuensisPlugin extends Plugin {
 		await this.loadSettings();
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new AmanuensisSettingTab(this.app, this));
+
+		// Register AI view
+		this.registerView(AI_VIEW_TYPE, (leaf) => new AIView(leaf));
+
+		// Register AI ribbon icon
+		registerAIRibbonIcon(this);
 
 		// Start the server
 		const port = validatePort(this.settings.port);

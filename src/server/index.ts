@@ -8,6 +8,7 @@ import { mastra, mcpServer } from "./mastra";
 
 import { validateAndCheckPort } from "./utils/port";
 import { PortNotAvailableError } from "./error";
+import { ChatHandler } from "./chat-handler";
 
 import { type Server } from "http";
 
@@ -25,12 +26,14 @@ export class AmanuensisServer {
 
 	private expressApplication: express.Application;
 	private mastra: MastraServer;
+	private chatHandler: ChatHandler;
 
 	private _serverInstance: Server;
 	private _lastError: Error | null = null;
 
 	private constructor(options: AmanuensisServerOptions = {}) {
 		this._port = options.port ?? DEFAULT_PORT;
+		this.chatHandler = new ChatHandler();
 	}
 
 	async init() {
@@ -43,8 +46,34 @@ export class AmanuensisServer {
 			mastra,
 		});
 
+		// 注册聊天 API 端点
+
+		this.expressApplication.post("/api/chat", async (req, res) => {
+			try {
+				const { message } = req.body as { message?: string };
+
+				if (!message || typeof message !== "string") {
+					res.status(400).json({
+						error: "Message is required",
+					});
+					return;
+				}
+
+				const response = await this.handleChatMessage(message);
+
+				res.json({
+					response,
+				});
+			} catch (error) {
+				console.error("Chat error:", error);
+				res.status(500).json({
+					error: "Internal server error",
+				});
+			}
+		});
+
 		// 注册 mcp
-		// eslint-disable-next-line @typescript-eslint/no-misused-promises
+
 		this.expressApplication.post("/mcp", async (req, res) => {
 			try {
 				await mcpServer.startHTTP({
@@ -63,6 +92,15 @@ export class AmanuensisServer {
 
 		// 初始化 mastra
 		await this.mastra.init();
+	}
+
+	private async handleChatMessage(message: string): Promise<string> {
+		try {
+			return await this.chatHandler.processMessage(message);
+		} catch (error) {
+			console.error("Error handling chat message:", error);
+			return "Sorry, I encountered an error processing your message.";
+		}
 	}
 
 	async start(port: number = this._port) {
