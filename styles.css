@@ -1320,3 +1320,243 @@ input:checked + .amanuensis-toggle-slider:before {
 .chat-messages-container::-webkit-scrollbar-thumb:hover {
 	background: var(--background-modifier-hover);
 }
+
+/* ============================================
+   AI View Model Selector
+   ============================================ */
+
+.ai-view-container {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+}
+
+.ai-view-header {
+	padding: 16px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	flex-shrink: 0;
+}
+
+.ai-view-header h2 {
+	margin: 0;
+	font-size: 1.2em;
+	font-weight: 600;
+}
+
+.ai-model-selector-container {
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.ai-model-label {
+	font-weight: 500;
+	white-space: nowrap;
+	color: var(--text-normal);
+}
+
+.ai-model-select {
+	flex: 1;
+	padding: 8px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	font-size: 0.95em;
+	cursor: pointer;
+}
+
+.ai-model-select:hover {
+	background-color: var(--background-secondary);
+}
+
+.ai-model-select:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 2px var(--interactive-accent-rgb, rgba(0, 122, 204, 0.1));
+}
+
+.ai-model-select option {
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+}
+
+.ai-messages-container {
+	flex: 1;
+	overflow-y: auto;
+	padding: 16px;
+}
+
+.ai-composer {
+	padding: 16px;
+	border-top: 1px solid var(--background-modifier-border);
+	flex-shrink: 0;
+}
+
+.ai-empty-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	color: var(--text-muted);
+	text-align: center;
+}
+
+.empty-icon {
+	font-size: 3em;
+	margin-bottom: 16px;
+}
+
+.empty-hint {
+	font-size: 0.9em;
+	margin-top: 8px;
+}
+
+.ai-messages {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.ai-message {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.ai-message.user {
+	justify-content: flex-end;
+}
+
+.ai-message.assistant {
+	justify-content: flex-start;
+}
+
+.message-content {
+	max-width: 70%;
+	padding: 12px 16px;
+	border-radius: 8px;
+	word-wrap: break-word;
+}
+
+.ai-message.user .message-content {
+	background-color: var(--interactive-accent);
+	color: white;
+}
+
+.ai-message.assistant .message-content {
+	background-color: var(--background-secondary);
+	color: var(--text-normal);
+}
+
+.message-text {
+	margin-bottom: 8px;
+}
+
+.message-actions {
+	display: flex;
+	gap: 8px;
+	opacity: 0;
+	transition: opacity 0.2s;
+}
+
+.ai-message:hover .message-actions {
+	opacity: 1;
+}
+
+.action-btn {
+	padding: 4px 8px;
+	font-size: 0.8em;
+	background: none;
+	border: none;
+	cursor: pointer;
+	color: var(--text-muted);
+	transition: color 0.2s;
+}
+
+.action-btn:hover {
+	color: var(--text-normal);
+}
+
+.message-loading {
+	display: flex;
+	gap: 4px;
+	align-items: center;
+	padding: 12px 16px;
+	background-color: var(--background-secondary);
+	border-radius: 8px;
+	width: fit-content;
+}
+
+.message-loading span {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background-color: var(--text-muted);
+	animation: pulse 1.4s infinite;
+}
+
+.message-loading span:nth-child(2) {
+	animation-delay: 0.2s;
+}
+
+.message-loading span:nth-child(3) {
+	animation-delay: 0.4s;
+}
+
+@keyframes pulse {
+	0%, 100% {
+		opacity: 0.3;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+
+.composer-input-wrapper {
+	display: flex;
+	gap: 8px;
+	align-items: flex-end;
+}
+
+.composer-input {
+	flex: 1;
+	padding: 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	font-family: inherit;
+	font-size: 0.95em;
+	resize: none;
+	max-height: 120px;
+	min-height: 40px;
+}
+
+.composer-input:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+}
+
+.composer-send-btn {
+	padding: 10px 16px;
+	background-color: var(--interactive-accent);
+	color: white;
+	border: none;
+	border-radius: 6px;
+	cursor: pointer;
+	font-weight: 500;
+	transition: background-color 0.2s;
+}
+
+.composer-send-btn:hover {
+	background-color: var(--interactive-accent-hover, var(--interactive-accent));
+}
+
+.composer-send-btn:active {
+	opacity: 0.8;
+}

@@ -46,11 +46,27 @@ export class AmanuensisServer {
 			mastra,
 		});
 
+		// 注册模型列表 API 端点
+		this.expressApplication.get("/api/models", async (req, res) => {
+			try {
+				const response = await this.handleGetModels();
+				res.json(response);
+			} catch (error) {
+				console.error("Get models error:", error);
+				res.status(500).json({
+					error: "Failed to fetch models",
+				});
+			}
+		});
+
 		// 注册聊天 API 端点
 
 		this.expressApplication.post("/api/chat", async (req, res) => {
 			try {
-				const { message } = req.body as { message?: string };
+				const { message, modelId } = req.body as {
+					message?: string;
+					modelId?: string;
+				};
 
 				if (!message || typeof message !== "string") {
 					res.status(400).json({
@@ -59,7 +75,14 @@ export class AmanuensisServer {
 					return;
 				}
 
-				const response = await this.handleChatMessage(message);
+				if (!modelId || typeof modelId !== "string") {
+					res.status(400).json({
+						error: "Model ID is required",
+					});
+					return;
+				}
+
+				const response = await this.handleChatMessage(message, modelId);
 
 				res.json({
 					response,
@@ -94,12 +117,52 @@ export class AmanuensisServer {
 		await this.mastra.init();
 	}
 
-	private async handleChatMessage(message: string): Promise<string> {
+	private async handleGetModels(): Promise<{
+		models: Array<{
+			id: string;
+			name: string;
+			modelId: string;
+			providerId: string;
+			enabled: boolean;
+		}>;
+	}> {
 		try {
-			return await this.chatHandler.processMessage(message);
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+			const plugin = (globalThis as any).__amanuensisPlugin;
+			if (!plugin) {
+				return { models: [] };
+			}
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+			if (!plugin.settings || !Array.isArray(plugin.settings.models)) {
+				return { models: [] };
+			}
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+			const models = plugin.settings.models as Array<{
+				id: string;
+				name: string;
+				modelId: string;
+				providerId: string;
+				enabled: boolean;
+			}>;
+			const enabledModels = models.filter((m) => m.enabled);
+			return { models: enabledModels };
+		} catch {
+			console.error("Error getting models");
+			return { models: [] };
+		}
+	}
+
+	private async handleChatMessage(
+		message: string,
+		modelId: string,
+	): Promise<string> {
+		try {
+			return await this.chatHandler.processMessage(message, modelId);
 		} catch (error) {
 			console.error("Error handling chat message:", error);
-			return "Sorry, I encountered an error processing your message.";
+			const errorMsg =
+				error instanceof Error ? error.message : String(error);
+			return `错误: ${errorMsg}`;
 		}
 	}
 

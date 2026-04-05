@@ -1,5 +1,6 @@
 import { ItemView, WorkspaceLeaf, requestUrl } from "obsidian";
 import { AI_TEXTS } from "./ai-const";
+import type { ModelEntry } from "../types/settings";
 
 export const AI_VIEW_TYPE = "ai-assistant-view";
 
@@ -12,6 +13,7 @@ interface ChatMessage {
 
 interface ChatResponse {
 	response?: string;
+	error?: string;
 }
 
 export class AIView extends ItemView {
@@ -19,6 +21,8 @@ export class AIView extends ItemView {
 	private isLoading = false;
 	private messagesContainer: HTMLDivElement | null = null;
 	private input: HTMLTextAreaElement | null = null;
+	private selectedModelId: string | null = null;
+	private availableModels: ModelEntry[] = [];
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -43,6 +47,8 @@ export class AIView extends ItemView {
 		const root = container.createDiv("ai-view-container");
 
 		this.createHeader(root);
+		await this.loadAvailableModels();
+		this.createModelSelector(root);
 		this.createMessagesContainer(root);
 		this.createComposer(root);
 
@@ -53,10 +59,73 @@ export class AIView extends ItemView {
 		this.messages = [];
 	}
 
+	private async loadAvailableModels(): Promise<void> {
+		try {
+			const response = await requestUrl({
+				url: "http://localhost:8761/api/models",
+				method: "GET",
+				headers: {
+					"Content-Type": "application/json",
+				},
+			});
+
+			if (response.status === 200) {
+				const data = response.json as { models?: ModelEntry[] };
+				this.availableModels = data.models || [];
+				if (
+					this.availableModels.length > 0 &&
+					this.availableModels[0]
+				) {
+					this.selectedModelId = this.availableModels[0].id;
+				}
+			}
+		} catch (error) {
+			console.error("Failed to load models:", error);
+			this.availableModels = [];
+		}
+	}
+
 	private createHeader(container: HTMLElement): void {
 		const header = container.createDiv("ai-view-header");
 		const title = header.createEl("h2");
 		title.textContent = AI_TEXTS.VIEW_TITLE;
+	}
+
+	private createModelSelector(container: HTMLElement): void {
+		const selectorContainer = container.createDiv(
+			"ai-model-selector-container",
+		);
+
+		const label = selectorContainer.createEl("label", {
+			cls: "ai-model-label",
+		});
+		label.textContent = "选择模型:";
+
+		const select = selectorContainer.createEl("select", {
+			cls: "ai-model-select",
+		});
+
+		if (this.availableModels.length === 0) {
+			const option = select.createEl("option");
+			option.value = "";
+			option.textContent = "未配置模型";
+			option.disabled = true;
+			option.selected = true;
+		} else {
+			this.availableModels.forEach((model) => {
+				const option = select.createEl("option");
+				option.value = model.id;
+				option.textContent = `${model.name} (${model.modelId})`;
+				if (model.id === this.selectedModelId) {
+					option.selected = true;
+				}
+			});
+		}
+
+		select.addEventListener("change", (e) => {
+			const target = e.target as HTMLSelectElement;
+			this.selectedModelId = target.value || null;
+		});
 	}
 
 	private createMessagesContainer(container: HTMLElement): void {
@@ -176,6 +245,18 @@ export class AIView extends ItemView {
 		const message = this.input.value.trim();
 		if (!message) return;
 
+		if (!this.selectedModelId) {
+			const errorMessage: ChatMessage = {
+				id: Date.now().toString(),
+				role: "assistant",
+				content: "错误: 请先选择一个模型",
+				timestamp: Date.now(),
+			};
+			this.messages.push(errorMessage);
+			this.renderMessages();
+			return;
+		}
+
 		this.input.value = "";
 		this.input.setCssProps({
 			height: "auto",
@@ -201,7 +282,10 @@ export class AIView extends ItemView {
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify({ message }),
+				body: JSON.stringify({
+					message,
+					modelId: this.selectedModelId,
+				}),
 			});
 
 			if (response.status !== 200) {
