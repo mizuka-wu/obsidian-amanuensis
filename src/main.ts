@@ -6,8 +6,7 @@ import {
 	AmanuensisSettingTab,
 } from "./settings";
 import { validatePort, getPortErrorMessage } from "./utils/port-validator";
-import { AIView, AI_VIEW_TYPE } from "./ui/ai-view";
-import { registerAIRibbonIcon } from "./ui/ai-ribbon-icon";
+import { AIAssistantView, registerAIRibbon, UI_CONFIG } from "./ui";
 
 // Remember to rename these classes and interfaces!
 
@@ -22,10 +21,13 @@ export default class AmanuensisPlugin extends Plugin {
 		this.addSettingTab(new AmanuensisSettingTab(this.app, this));
 
 		// Register AI view
-		this.registerView(AI_VIEW_TYPE, (leaf) => new AIView(leaf));
+		this.registerView(
+			UI_CONFIG.VIEW_TYPE,
+			(leaf) => new AIAssistantView(leaf),
+		);
 
 		// Register AI ribbon icon
-		registerAIRibbonIcon(this);
+		registerAIRibbon(this);
 
 		// Start the server
 		const port = validatePort(this.settings.port);
@@ -38,6 +40,10 @@ export default class AmanuensisPlugin extends Plugin {
 		});
 
 		await this.server.start();
+
+		// Register plugin instance globally AFTER server starts to avoid race conditions
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+		(globalThis as any).__amanuensisPlugin = this;
 	}
 
 	// eslint-disable-next-line @typescript-eslint/no-misused-promises

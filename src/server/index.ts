@@ -95,6 +95,41 @@ export class AmanuensisServer {
 			}
 		});
 
+		// 注册清空对话历史 API 端点
+		this.expressApplication.post("/api/chat/reset", async (req, res) => {
+			try {
+				this.chatHandler.resetConversation();
+				res.json({ success: true });
+			} catch (error) {
+				console.error("Reset chat error:", error);
+				res.status(500).json({
+					error: "Failed to reset conversation",
+				});
+			}
+		});
+
+		// 注册删除消息 API 端点
+		this.expressApplication.post("/api/chat/delete", async (req, res) => {
+			try {
+				const { messageId } = req.body as { messageId?: string };
+
+				if (!messageId || typeof messageId !== "string") {
+					res.status(400).json({
+						error: "Message ID is required",
+					});
+					return;
+				}
+
+				const deleted = this.chatHandler.deleteMessage(messageId);
+				res.json({ success: deleted });
+			} catch (error) {
+				console.error("Delete message error:", error);
+				res.status(500).json({
+					error: "Failed to delete message",
+				});
+			}
+		});
+
 		// 注册 mcp
 
 		this.expressApplication.post("/mcp", async (req, res) => {
@@ -130,10 +165,12 @@ export class AmanuensisServer {
 			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
 			const plugin = (globalThis as any).__amanuensisPlugin;
 			if (!plugin) {
+				console.warn("Plugin instance not available");
 				return { models: [] };
 			}
 			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 			if (!plugin.settings || !Array.isArray(plugin.settings.models)) {
+				console.warn("Plugin settings or models array not available");
 				return { models: [] };
 			}
 			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
@@ -144,10 +181,12 @@ export class AmanuensisServer {
 				providerId: string;
 				enabled: boolean;
 			}>;
-			const enabledModels = models.filter((m) => m.enabled);
-			return { models: enabledModels };
-		} catch {
-			console.error("Error getting models");
+			return { models };
+		} catch (error) {
+			console.error(
+				"Error getting models:",
+				error instanceof Error ? error.message : String(error),
+			);
 			return { models: [] };
 		}
 	}

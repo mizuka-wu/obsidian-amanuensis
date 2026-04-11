@@ -1,7 +1,11 @@
-export interface ChatMessage {
-	role: "user" | "assistant";
-	content: string;
-}
+import type {
+	ChatMessage,
+	ModelConfig,
+	ProviderConfig,
+	PluginInstance,
+} from "./types";
+
+export type { ChatMessage };
 
 export class ChatHandler {
 	private conversationHistory: ChatMessage[] = [];
@@ -31,59 +35,60 @@ export class ChatHandler {
 		return response;
 	}
 
+	resetConversation(): void {
+		this.clearHistory();
+	}
+
+	deleteMessage(messageId: string): boolean {
+		const index = this.conversationHistory.findIndex(
+			(m) => m.id === messageId,
+		);
+		if (index !== -1) {
+			this.conversationHistory.splice(index, 1);
+			return true;
+		}
+		return false;
+	}
+
 	private async generateResponse(
 		userMessage: string,
 		modelId: string,
 	): Promise<string> {
 		try {
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-			const plugin = (globalThis as any).__amanuensisPlugin;
+			const plugin = this.getPluginInstance();
 			if (!plugin) {
 				return "错误: 无法访问插件配置";
 			}
 
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
 			const settings = plugin.settings;
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 			if (!settings || !Array.isArray(settings.models)) {
 				return "错误: 模型配置无效";
 			}
 
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
-			const model = settings.models.find((m: any) => m.id === modelId);
+			const model = this.findModel(settings.models, modelId);
 			if (!model) {
 				return "错误: 模型未找到";
 			}
 
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 			if (!model.enabled) {
 				return "错误: 选定的模型已禁用";
 			}
 
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
 			const providers = settings.providers;
 			if (!providers || typeof providers !== "object") {
 				return "错误: 提供商配置无效";
 			}
 
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 			const provider = providers[model.providerId];
 			if (!provider) {
 				return "错误: 模型的提供商配置未找到";
 			}
 
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 			if (!provider.apiKey) {
 				return "错误: 模型的 API 密钥未配置";
 			}
 
-			const response = await this.callModelWithMastra(
-				userMessage,
-				model,
-				provider,
-			);
-
-			return response;
+			return await this.callModelWithMastra(userMessage, model, provider);
 		} catch (error) {
 			console.error("Error generating response:", error);
 			const errorMsg =
@@ -93,22 +98,32 @@ export class ChatHandler {
 		}
 	}
 
+	private getPluginInstance(): PluginInstance | null {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+		const plugin = (globalThis as any).__amanuensisPlugin as
+			| PluginInstance
+			| undefined;
+		return plugin || null;
+	}
+
+	private findModel(
+		models: ModelConfig[],
+		modelId: string,
+	): ModelConfig | undefined {
+		return models.find((m) => m.id === modelId);
+	}
+
 	private async callModelWithMastra(
 		userMessage: string,
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		model: any,
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		provider: any,
+		model: ModelConfig,
+		provider: ProviderConfig,
 	): Promise<string> {
 		try {
 			const { createChatAgent } = await import("./mastra");
 
 			const agent = createChatAgent(
-				// eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
 				model.modelId,
-				// eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
 				provider.apiKey,
-				// eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
 				provider.baseUrl,
 			);
 
